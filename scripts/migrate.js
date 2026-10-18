@@ -1,22 +1,48 @@
 import { createHash } from 'node:crypto'
 import { readdir, readFile } from 'node:fs/promises'
 import { fileURLToPath } from 'node:url'
-import { createPool } from '../src/db.js'
+import { createPool, isSupabaseHost } from '../src/db.js'
 
-const target = process.env.MIGRATION_TARGET
 const url = new URL(process.env.DATABASE_URL || 'postgresql://missing:missing@invalid/missing')
 const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
+const sslMode = process.env.DB_SSL_MODE || 'disable'
 
-if (target === 'local') {
-  if (!localHosts.has(url.hostname)) {
-    throw new Error('MIGRATION_TARGET=local requiere DATABASE_URL en localhost')
-  }
-} else if (target === 'render') {
-  if (localHosts.has(url.hostname) || process.env.MIGRATION_CONFIRM_HOST !== url.hostname) {
-    throw new Error('Migración remota requiere MIGRATION_CONFIRM_HOST igual al host de DATABASE_URL')
-  }
-} else {
-  throw new Error('Define MIGRATION_TARGET=local o render para ejecutar migraciones')
+const targets = {
+  local() {
+    if (!localHosts.has(url.hostname)) {
+      throw new Error('MIGRATION_TARGET=local requiere DATABASE_URL en localhost')
+    }
+  },
+  supabase() {
+    if (localHosts.has(url.hostname)) {
+      throw new Error('MIGRATION_TARGET=supabase no admite localhost')
+    }
+    if (!isSupabaseHost(url.hostname)) {
+      throw new Error(`MIGRATION_TARGET=supabase requiere un host de Supabase; recibido: ${url.hostname}`)
+    }
+    if (process.env.MIGRATION_CONFIRM_HOST !== url.hostname) {
+      throw new Error('Migración a Supabase requiere MIGRATION_CONFIRM_HOST igual al host de DATABASE_URL')
+    }
+    if (sslMode === 'disable') {
+      throw new Error('MIGRATION_TARGET=supabase requiere DB_SSL_MODE=require o verify-full')
+    }
+  },
+  render() {
+    if (localHosts.has(url.hostname) || process.env.MIGRATION_CONFIRM_HOST !== url.hostname) {
+      throw new Error('Migración remota requiere MIGRATION_CONFIRM_HOST igual al host de DATABASE_URL')
+    }
+  },
+}
+
+const target = process.env.MIGRATION_TARGET
+const validate = Object.hasOwn(targets, target) ? targets[target] : null
+if (!validate) {
+  throw new Error('Define MIGRATION_TARGET=local, supabase o render para ejecutar migraciones')
+}
+validate()
+
+if (target === 'supabase') {
+  console.log(`Destino: Supabase en ${url.hostname}/${url.pathname.slice(1)} (TLS ${sslMode})`)
 }
 
 const migrationsDir = fileURLToPath(new URL('../migrations/', import.meta.url))

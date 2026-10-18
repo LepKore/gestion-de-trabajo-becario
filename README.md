@@ -21,7 +21,7 @@ npm install
 
 En PowerShell, el primer comando es `Copy-Item .env.example .env`. Ajusta `POSTGRES_PASSWORD` a una clave de desarrollo propia y sincroniza usuario, clave, base y puerto con `DATABASE_URL`. Si 5432 está ocupado, cambia `POSTGRES_PORT` y el puerto en `DATABASE_URL` (por ejemplo 5433). La configuración de Compose se lee del archivo `.env` en esta carpeta; Node.js lo carga por separado mediante `--env-file=.env` en los scripts `dev` y `db:migrate`. Para producción se usan variables de entorno del proveedor y `npm start`.
 
-`.env` y otros archivos `.env.*` están excluidos de Git. `.env.example` contiene únicamente valores ficticios de desarrollo. No copies credenciales de otras bases ni de Render.
+`.env` y otros archivos `.env.*` están excluidos de Git. `.env.example` contiene únicamente valores ficticios de desarrollo, incluidos los marcadores `<...>` de la plantilla de Supabase. No copies credenciales de bases ajenas al proyecto, en particular de la base Render mencionada en otro trabajo.
 
 ## Comandos cotidianos
 
@@ -65,7 +65,59 @@ Cada integrante tiene su propio contenedor y volumen local; los registros no se 
 
 La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json`, ejecuta `npm run check`, migraciones y `GET /ready`. No tiene acceso a Render. Aún faltan pruebas del dominio y del contrato; este workflow solo comprueba la infraestructura actual.
 
-## Transición futura a Render
+## Conectar con Supabase (despliegue)
+
+La misma API y las mismas migraciones funcionan contra Supabase sin cambios de código. Localmente se usa el PostgreSQL de `compose.yaml`; en despliegue, Supabase.
+
+### 1. Obtener la cadena de conexión
+
+En Supabase, **Project Settings → Database → Connection string**, elige el modo **URI** y el modo **transacción** (puerto **6543**). El modo transacción es el indicado para un backend desplegado porque el pooler reparte conexiones sin fijar una sesión por cliente.
+
+La contraseña que aparece ahí debe ir **codificada en URL** antes de pegarla en `DATABASE_URL` (`@` → `%40`, `:` → `%3A`, `/` → `%2F`). Si no la codificas, la URL no representará el mismo valor y `new URL()` la leerá mal.
+
+### 2. Configurar el despliegue
+
+Define en el proveedor de despliegue, no en un `.env` de producción:
+
+| Variable | Valor |
+| --- | --- |
+| `DATABASE_URL` | `postgresql://postgres.<project-ref>:<clave_codificada>@aws-0-<region>.pooler.supabase.com:6543/postgres` |
+| `DB_SSL_MODE` | `require` (o `verify-full` si añades `DB_SSL_CA_FILE`) |
+| `DB_SSL_CA_FILE` | `certs/prod-ca-2021.crt` |
+| `DB_POOL_MAX` | `5` o menos para no agotar el plan |
+| `HOST` | `0.0.0.0` |
+| `PORT` | el que asigne el proveedor |
+| `CORS_ORIGIN` | el dominio real del frontend |
+
+`certs/prod-ca-2021.crt` es el certificado raíz público de Supabase, sin clave privada, y está versionado a propósito: sin él, la verificación del servidor falla y cada entorno tendría que descargarlo por su cuenta. Se descarga en **Project Settings → Database → SSL Configuration → Download CA certificate**.
+
+`DB_SSL_MODE=disable` es solo para local. No se desactiva globalmente la verificación de certificados.
+
+### 3. Aplicar las migraciones contra Supabase
+
+Las migraciones **no** se ejecutan al iniciar la API. Aplícalas explícitamente, una sola vez por versión, desde una máquina con Node y acceso al proyecto:
+
+```bash
+MIGRATION_TARGET=supabase \
+MIGRATION_CONFIRM_HOST=aws-0-<region>.pooler.supabase.com \
+DB_SSL_MODE=require \
+npm run db:migrate:env
+```
+
+`MIGRATION_TARGET=supabase` exige que el host termine en `supabase.com`, que `MIGRATION_CONFIRM_HOST` coincida exactamente con el host de `DATABASE_URL` y que TLS esté activo. Los tres controles deben pasar; si alguno falla, no se aplica nada.
+
+### 4. Verificar
+
+`GET /ready` ejecuta `SELECT 1` contra Supabase y devuelve 503 si la conexión falla. El historial aplicado se consulta con `SELECT filename, applied_at FROM schema_migrations ORDER BY filename` y debe coincidir con el de local.
+
+### Notas importantes
+
+- **Pooler en modo transacción.** `node-postgres` solo usa sentencias preparadas *con nombre* si se pasa `name` en la configuración de la consulta. El código de este repositorio no lo hace y `src/db.js` no habilita ninguna. No añadas `name` sin revisar este punto.
+- **Límite de conexiones.** El pool es pequeño por defecto (`DB_POOL_MAX=5`). Subirlo es la forma más rápida de agotar el plan de Supabase.
+- **No se usa el CLI de Supabase.** `supabase db push` y `supabase link` queda fuera: el historial vive en `schema_migrations` y lo administra `scripts/migrate.js`. Mezclar ambos ejecutores duplicaría el control de versiones.
+- **No hay copia de datos.** Cambiar `DATABASE_URL` no transfiere los datos locales. La carga de datos de desarrollo, si algún día hace falta, se decide por separado.
+
+## Alternativa: despliegue en Render
 
 Cuando se cree una base PostgreSQL **nueva para MiBeca**, configura `DATABASE_URL` en el servicio backend, junto con `DB_SSL_MODE` y, si el proveedor entrega una CA, `DB_SSL_CA_FILE`. `DB_SSL_MODE=disable` es solo la opción local; `require` y `verify-full` activan TLS manteniendo `rejectUnauthorized: true`. No se desactiva globalmente la verificación de certificados. Evita `sslmode` dentro de la URL para que una sola variable gobierne TLS.
 

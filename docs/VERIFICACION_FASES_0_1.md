@@ -22,4 +22,20 @@ Fecha: 18 de octubre de 2026. Se usa la numeración del [plan general](PLAN_MVP_
 | Instalación reproducible backend | Se generó `package-lock.json`; `npm ci` y `npm run check` finalizaron correctamente. CI backend cambió de `npm install` a `npm ci`. |
 | Frontend | `npm run lint` y `npm run build` finalizaron correctamente con Vite 8.3.4. |
 
+## Conexión a Supabase (18 de octubre de 2026)
+
+Rama `Ivan`. Se añadió el destino `MIGRATION_TARGET=supabase` conservando `local` y `render`, `DB_POOL_MAX`/`DB_POOL_IDLE_TIMEOUT_MS` en `src/db.js` y la plantilla comentada de Supabase en `.env.example`.
+
+| Comprobación | Resultado local |
+|---|---|
+| Sintaxis | `npm run check` finalizó correctamente. |
+| Guardas de destino | Rechazan con el mensaje esperado: `supabase` con `DATABASE_URL` en localhost, `supabase` con host que no termina en `supabase.com`, `MIGRATION_CONFIRM_HOST` distinto, `DB_SSL_MODE=disable` y un target inexistente. El camino `render` conserva su comportamiento previo. |
+| Aviso de destino | El camino válido imprime `Destino: Supabase en <host>/postgres (TLS require)` sin contraseña y solo falla después, al resolver el DNS de un host inexistente. |
+| Compose | `docker compose config --quiet` acepta `.env.example` con los nuevos comentarios comentados. |
+| Camino local intacto | PostgreSQL 17.11 en `127.0.0.1:5432`; `npm run db:migrate` finalizó correctamente y `GET /health` y `GET /ready` respondieron correctamente. |
+
+| Conexión real a Supabase | Verificada contra un proyecto de prueba con el pooler en modo transacción (puerto 6543). Las credenciales son válidas y `schema_migrations` se creó en la base, que estaba vacía. Exige `DB_SSL_CA_FILE` apuntando a `certs/prod-ca-2021.crt`: sin él la conexión falla con `SELF_SIGNED_CERT_IN_CHAIN` porque la CA del pooler no está en el almacén de confianza del sistema. |
+
+**Pendiente**: restablecer la contraseña de Supabase usada en esta prueba, que quedó expuesta en el chat, antes de usarla en serio. La CI no se modificó y sigue usando PostgreSQL efímero local; nunca recibe credenciales de Supabase.
+
 El backend conserva `/health` y `/ready`, pero no tiene tablas ni rutas de dominio. La interfaz no usa una API real. Los workflows Firebase y backend existen; no se comprobaron ejecuciones remotas ni despliegues. La fase siguiente es contrato OpenAPI y esquema del dominio.
