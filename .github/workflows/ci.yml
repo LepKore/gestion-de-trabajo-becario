@@ -1,0 +1,50 @@
+name: Backend CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11
+        env:
+          POSTGRES_USER: mibeca_ci
+          POSTGRES_PASSWORD: mibeca_ci_only
+          POSTGRES_DB: mibeca_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U mibeca_ci -d mibeca_ci"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_ci
+      MIGRATION_TARGET: local
+      DB_SSL_MODE: disable
+      HOST: 127.0.0.1
+      PORT: 3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm ci --no-audit --no-fund
+      - run: npm run check
+      - run: npm run db:migrate:env
+      - name: Comprobar disponibilidad de API y PostgreSQL
+        run: |
+          npm start &
+          api_pid=$!
+          trap 'kill "$api_pid"' EXIT
+          for attempt in 1 2 3 4 5 6 7 8 9 10; do
+            if curl --fail --silent http://127.0.0.1:3000/ready; then
+              exit 0
+            fi
+            sleep 1
+          done
+          exit 1

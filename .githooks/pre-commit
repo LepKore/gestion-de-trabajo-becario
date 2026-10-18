@@ -1,0 +1,51 @@
+#!/usr/bin/env python
+"""Revisa los blobs preparados para commit sin mostrar posibles secretos."""
+
+import re
+import subprocess
+import sys
+
+
+FORBIDDEN_NAME = re.compile(
+    rb"(^|/)(\.env(?:\..+)?|id_(?:rsa|ed25519)|[^/]*firebase-adminsdk[^/]*\.json|"
+    rb"[^/]*(?:service[-_]account|credentials)[^/]*\.json)$|\.(?:pem|p12|pfx|key)$",
+    re.IGNORECASE,
+)
+SECRET_MARKERS = (
+    re.compile(rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----"),
+    re.compile(rb"\bgithub_pat_[A-Za-z0-9_]{20,}"),
+    re.compile(rb"\bghp_[A-Za-z0-9]{20,}"),
+    re.compile(rb"\bAKIA[0-9A-Z]{16}\b"),
+)
+
+
+def git(*args):
+    return subprocess.run(["git", *args], check=True, capture_output=True).stdout
+
+
+def main():
+    paths = git("diff", "--cached", "--name-only", "--diff-filter=ACMR", "-z").split(b"\0")
+    rejected = []
+    for path in filter(None, paths):
+        example = path.endswith(b".env.example")
+        name = path.decode("utf-8", "surrogateescape")
+        if not example and FORBIDDEN_NAME.search(path):
+            rejected.append(name)
+            continue
+        try:
+            blob = git("show", ":" + name)
+        except subprocess.CalledProcessError:
+            continue
+        if b"\0" not in blob and any(pattern.search(blob) for pattern in SECRET_MARKERS):
+            rejected.append(name)
+    if rejected:
+        print("pre-commit MiBeca: posibles secretos en archivos preparados:", file=sys.stderr)
+        for name in rejected:
+            print(f"  {name}", file=sys.stderr)
+        print("Retira esos archivos del commit y revisa su contenido localmente.", file=sys.stderr)
+        return 1
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

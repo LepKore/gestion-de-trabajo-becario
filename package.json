@@ -1,0 +1,19 @@
+{
+  "name": "mibeca-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --env-file=.env src/server.js",
+    "start": "node src/server.js",
+    "db:migrate": "node --env-file=.env scripts/migrate.js",
+    "db:migrate:env": "node scripts/migrate.js",
+    "check": "node --check src/db.js && node --check src/server.js && node --check scripts/migrate.js"
+  },
+  "dependencies": {
+    "pg": "^8.16.3"
+  }
+}
