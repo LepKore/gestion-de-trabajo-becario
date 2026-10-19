@@ -105,6 +105,18 @@ def blocked(command, cwd):
     return None
 
 
+def blocked_migration(command):
+    lowered = command.lower()
+    migration_commands = ("db:migrate", "db:migrate:env", "db:create-admin", "db:bootstrap-admin")
+    if not any(item in lowered for item in migration_commands):
+        return None
+    if "migration_target=local" in lowered and not any(host in lowered for host in ("supabase", "render")):
+        return None
+    if "localhost" in lowered or "127.0.0.1" in lowered or "::1" in lowered:
+        return None
+    return "migración u operación administrativa con destino no local"
+
+
 def main():
     event = json.load(sys.stdin)
     tool_input = event.get("tool_input") or {}
@@ -113,13 +125,14 @@ def main():
         return
     cwd = path_of(tool_input.get("workdir") or event.get("cwd") or os.getcwd(), Path.cwd())
     condition = blocked(command, cwd)
+    condition = condition or blocked_migration(command)
     if condition is None:
         return
     reason = (
         f"Hook local MiBeca: operación rechazada por {condition}. "
-        "Detener o recrear sin -v está permitido. Si una persona autoriza borrar "
-        "datos, debe revisar destino y respaldo y ejecutar la orden manualmente "
-        "fuera de Codex; el agente no puede cambiar este control para pasar."
+        "Revisa el destino y ejecuta operaciones remotas o destructivas manualmente "
+        "fuera de Codex con autorización explícita; el agente no puede cambiar este "
+        "control para pasar."
     )
     print(json.dumps({"hookSpecificOutput": {
         "hookEventName": "PreToolUse",
