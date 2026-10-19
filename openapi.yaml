@@ -1,0 +1,1594 @@
+openapi: 3.1.0
+info:
+  title: MiBeca API
+  version: 1.3.0
+  description: >-
+    Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
+    Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
+    Convenciones: prefijo /api/v1, JSON UTF-8, UUID, fechas UTC, duraciones en
+    minutos enteros. Éxitos envueltos en `data`; errores con `code` y `message`.
+  license:
+    name: Uso académico del equipo MiBeca
+servers:
+  - url: http://127.0.0.1:3000/api/v1
+    description: Local
+
+tags:
+  - name: Auth
+    description: Inicio y fin de sesión, y cambio de contraseña.
+  - name: Usuarios
+    description: Administración de cuentas, exclusiva del administrador.
+
+  - name: Trabajos
+    description: Publicación y consulta de trabajos y condiciones.
+  - name: Postulaciones
+    description: Postulación propia y decisiones del propietario con cupos seguros.
+  - name: Control
+    description: Cierre único, asistencia, progreso e historial propios.
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      summary: Inicia sesión y emite cookie de sesión
+      description: >-
+        Público. Normaliza el correo. No revela si el correo existe. Emite la
+        cookie `mibeca_session` (HttpOnly) y, si el usuario tiene
+        `requiere_cambio_password`, la respuesta lo indica para forzar el cambio.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [correo, password]
+              additionalProperties: false
+              properties:
+                correo: { type: string, format: email, example: becario@uni.edu }
+                password: { type: string, minLength: 1, example: 'ClaveTemporal#1' }
+      responses:
+        '200':
+          description: Sesión iniciada
+          headers:
+            Set-Cookie:
+              schema: { type: string }
+              description: 'mibeca_session=...; HttpOnly; SameSite=Lax; Secure en HTTPS'
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/SesionActual' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '429': { $ref: '#/components/responses/ErrorDemasiadosIntentos' }
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      summary: Revoca la sesión actual
+      description: Requiere sesión válida y cabecera `X-CSRF-Token`. Idempotente.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '204': { description: Sesión revocada }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      operationId: getSession
+      summary: Devuelve el usuario de la sesión actual
+      description: >-
+        401 si no hay sesión, si expiró, si fue revocada o si el usuario está
+        desactivado. `requiere_cambio_password` en `true` limita el acceso a
+        rutas de negocio hasta completar el cambio.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Usuario de la sesión
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/SesionActual' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+
+  /auth/change-password:
+    post:
+      tags: [Auth]
+      operationId: changePassword
+      summary: Cambia la contraseña del usuario en sesión
+      description: >-
+        Único endpoint permitido mientras `requiere_cambio_password` es `true`.
+        Exige contraseña actual, nueva de al menos 10 caracteres, distinta de la
+        actual y confirmación coincidente. Al cambiar se revocan todas las
+        sesiones del usuario y se emite una nueva cookie con la sesión actual.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [passwordActual, passwordNuevo, passwordNuevoConfirmacion]
+              additionalProperties: false
+              properties:
+                passwordActual: { type: string, minLength: 1 }
+                passwordNuevo: { type: string, minLength: 10, maxLength: 200 }
+                passwordNuevoConfirmacion: { type: string, minLength: 10, maxLength: 200 }
+      responses:
+        '200':
+          description: Contraseña actualizada; sesión renovada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/SesionActual' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /users:
+    get:
+      tags: [Usuarios]
+      operationId: listarUsuarios
+      summary: Lista usuarios (solo ADMIN)
+      description: >-
+        Paginado con máximo 50 por página, orden estable por nombre y correo.
+        Nunca incluye hashes ni contraseñas temporales.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: rol
+          in: query
+          schema: { type: string, enum: [ADMIN, ENCARGADO, BECARIO] }
+        - name: activo
+          in: query
+          schema: { type: boolean }
+        - name: q
+          in: query
+          description: Búsqueda por nombre, correo o código de estudiante
+          schema: { type: string, maxLength: 100 }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 1, default: 1 }
+        - name: pageSize
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+      responses:
+        '200':
+          description: Página de usuarios
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data, meta]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/Usuario' }
+                  meta: { $ref: '#/components/schemas/Paginado' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+    post:
+      tags: [Usuarios]
+      operationId: crearUsuario
+      summary: Crea un usuario (solo ADMIN)
+      description: >-
+        BECARIO exige `estudiante`; ENCARGADO exige `encargado`. El rol queda
+        fijo tras el alta. La contraseña temporal se genera en el servidor, se
+        devuelve **una sola vez** en `data.passwordTemporal` y el usuario nace
+        con `requiere_cambio_password = true`.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NuevoUsuario' }
+            examples:
+              estudiante:
+                value:
+                  nombre: Ana Pérez
+                  correo: ana.perez@uni.edu
+                  rol: BECARIO
+                  estudiante:
+                    codigo: '00731'
+                    carrera: Ingeniería de Sistemas
+                    semestre: 4
+                    metaMinutos: 120
+              encargado:
+                value:
+                  nombre: Luis Gómez
+                  correo: luis.gomez@uni.edu
+                  rol: ENCARGADO
+                  encargado:
+                    contextoTipo: MATERIA
+                    contextoNombre: Programación II
+      responses:
+        '201':
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    allOf:
+                      - $ref: '#/components/schemas/Usuario'
+                      - type: object
+                        required: [passwordTemporal]
+                        properties:
+                          passwordTemporal:
+                            type: string
+                            description: Se muestra una sola vez; entréguela personalmente.
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /users/{id}:
+    parameters: [{ $ref: '#/components/parameters/UsuarioId' }]
+    get:
+      tags: [Usuarios]
+      operationId: obtenerUsuario
+      summary: Detalle de un usuario (solo ADMIN)
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+    patch:
+      tags: [Usuarios]
+      operationId: actualizarUsuario
+      summary: Edita nombre, correo y perfil (solo ADMIN)
+      description: >-
+        El `rol` no es editable en esta entrega: enviarlo devuelve 400. La baja
+        lógica y el restablecimiento de contraseña usan rutas dedicadas.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EditarUsuario' }
+      responses:
+        '200':
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /users/{id}/deactivate:
+    parameters: [{ $ref: '#/components/parameters/UsuarioId' }]
+    post:
+      tags: [Usuarios]
+      operationId: desactivarUsuario
+      summary: Da de baja lógicamente a un usuario (solo ADMIN)
+      description: >-
+        Conserva el historial, revoca todas las sesiones del usuario y no puede
+        aplicarse al último administrador activo (409 `ultimo_admin_activo`).
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: Usuario desactivado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Usuario' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /users/{id}/reactivate:
+    parameters: [{ $ref: '#/components/parameters/UsuarioId' }]
+    post:
+      tags: [Usuarios]
+      operationId: reactivarUsuario
+      summary: Reactiva un usuario (solo ADMIN)
+      description: No revive sesiones anteriores; el usuario vuelve a entrar con contraseña.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: Usuario reactivado
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Usuario' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /users/{id}/reset-password:
+    parameters: [{ $ref: '#/components/parameters/UsuarioId' }]
+    post:
+      tags: [Usuarios]
+      operationId: restablecerPassword
+      summary: Restablece la contraseña (solo ADMIN)
+      description: >-
+        Revoca todas las sesiones, genera una contraseña temporal que se
+        devuelve una sola vez y exige cambio en el próximo acceso. Sin correo.
+      security: [{ cookieAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/CsrfToken' }]
+      responses:
+        '200':
+          description: Contraseña restablecida
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [passwordTemporal]
+                    properties:
+                      passwordTemporal:
+                        type: string
+                        description: Se muestra una sola vez; entréguela personalmente.
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+
+  /jobs:
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "listarTrabajos"
+      summary: "Consulta trabajos publicados y cerrados"
+      description: "Todos los roles autenticados sin cambio de contraseña pendiente. Incluye disponibilidad calculada; orden estable por fecha e ID."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PUBLICADO"
+              - "CERRADO"
+        -
+          name: "q"
+          in: "query"
+          schema:
+            type: "string"
+            minLength: 1
+            maxLength: 100
+      responses:
+        200:
+          description: "Consulta trabajos publicados y cerrados"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Trabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    post:
+      tags:
+        - "Trabajos"
+      operationId: "crearTrabajo"
+      summary: "Publica un trabajo propio"
+      description: "Solo ENCARGADO activo. Inicio futuro y fin posterior. Copia el contexto del encargado al publicar. Duración explícita, nunca calculada a partir del reloj."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        201:
+          description: "Publica un trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/TrabajoInput"
+  /jobs/{id}:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "consultarTrabajo"
+      summary: "Consulta un trabajo"
+      description: "Disponible a los tres roles autenticados; no incluye datos personales de postulantes."
+      security:
+        -
+          cookieAuth: []
+      parameters: []
+      responses:
+        200:
+          description: "Consulta un trabajo"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    patch:
+      tags:
+        - "Trabajos"
+      operationId: "editarTrabajo"
+      summary: "Edita condiciones de un trabajo propio"
+      description: "Solo ENCARGADO propietario, antes del inicio y antes de cualquier aceptación. Comprueba los campos combinados con valores existentes. Serializa edición y aceptación; 409 si condiciones fijadas, 403 si ajeno."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Edita condiciones de un trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/TrabajoPatch"
+  /jobs/{id}/applications:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    get:
+      tags:
+        - "Postulaciones"
+      operationId: "listarPostulantes"
+      summary: "Lista postulantes del trabajo propio"
+      description: "Solo ENCARGADO propietario. Datos del estudiante limitados a nombre, código y carrera. Otros roles o propietario ajeno reciben 403."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PENDIENTE"
+              - "ACEPTADA"
+              - "RECHAZADA"
+      responses:
+        200:
+          description: "Lista postulantes del trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PostulacionConEstudiante"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "postularTrabajo"
+      summary: "Postula al becario autenticado"
+      description: "Solo BECARIO activo, trabajo PUBLICADO antes del inicio con cupo disponible. PENDIENTE no reserva cupo. Una postulación por estudiante/trabajo; duplicados devuelven 409."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        201:
+          description: "Postula al becario autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /applications/{id}/accept:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "aceptarPostulacion"
+      summary: "Acepta una postulación pendiente"
+      description: "Solo ENCARGADO propietario antes del inicio. Comprueba cuenta del estudiante activa y cupo dentro de transacción con bloqueo del trabajo; dos aceptaciones sobre el último cupo producen un éxito y un conflicto. Decisión irreversible."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Acepta una postulación pendiente"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /applications/{id}/reject:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "rechazarPostulacion"
+      summary: "Rechaza una postulación pendiente"
+      description: "Solo ENCARGADO propietario antes del inicio. No permite revertir decisiones ni borrar historial. 409 si trabajo iniciado/cerrado o postulación ya decidida."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Rechaza una postulación pendiente"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /me/jobs:
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "listarTrabajosPropios"
+      summary: "Lista trabajos del encargado autenticado"
+      description: "Solo ENCARGADO. Nunca permite seleccionar otro propietario."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PUBLICADO"
+              - "CERRADO"
+        -
+          name: "q"
+          in: "query"
+          schema:
+            type: "string"
+            minLength: 1
+            maxLength: 100
+      responses:
+        200:
+          description: "Lista trabajos del encargado autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Trabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+  /me/applications:
+    get:
+      tags:
+        - "Postulaciones"
+      operationId: "listarPostulacionesPropias"
+      summary: "Lista postulaciones del becario autenticado"
+      description: "Solo BECARIO. Incluye trabajo y estado de cada postulación; no permite seleccionar otro estudiante."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PENDIENTE"
+              - "ACEPTADA"
+              - "RECHAZADA"
+      responses:
+        200:
+          description: "Lista postulaciones del becario autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PostulacionConTrabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+
+  /jobs/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    post:
+      tags: [Control]
+      operationId: cerrarTrabajo
+      summary: Cierra un trabajo y registra asistencia de todos los aceptados
+      description: >-
+        Solo ENCARGADO propietario activo, desde el fin previsto según el reloj
+        de PostgreSQL. Todos los aceptados aparecen exactamente una vez; cero
+        aceptados admite lista vacía. Asistentes reciben la duración completa,
+        ausentes cero. Pendientes pasan a RECHAZADA por CIERRE_TRABAJO.
+        La misma clave y contenido normalizado devuelve el resultado original;
+        la misma clave con otro contenido o un cierre nuevo devuelve 409.
+        El orden de attendance no afecta la idempotencia.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CierreInput' }
+      responses:
+        '200':
+          description: Trabajo cerrado o resultado idempotente previo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Cierre' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /jobs/{id}/attendance:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    get:
+      tags: [Control]
+      operationId: consultarAsistenciaTrabajo
+      summary: Consulta asistencia de un trabajo propio cerrado
+      description: Solo ENCARGADO propietario. Devuelve datos básicos del estudiante.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Asistencia registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AsistenciaDetallada' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /me/progress:
+    get:
+      tags: [Control]
+      operationId: consultarProgresoPropio
+      summary: Consulta meta y minutos acreditados del becario
+      description: Solo BECARIO; suma asistencia persistida, incluyendo trabajos cerrados.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Progreso propio
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Progreso' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /me/dashboard:
+    get:
+      tags: [Control]
+      operationId: consultarResumenEncargado
+      summary: Consulta métricas resumidas de trabajos propios
+      description: Solo ENCARGADO. Agrega sus trabajos publicados, postulaciones pendientes, aceptaciones y trabajos disponibles para cierre.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Métricas agregadas de la cuenta autenticada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/ResumenEncargado' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /me/history:
+    get:
+      tags: [Control]
+      operationId: consultarHistorialPropio
+      summary: Consulta historial propio de becario o encargado
+      description: >-
+        BECARIO recibe todas sus postulaciones, incluidas abiertas y ausencias;
+        attended es null si no se registró asistencia para esa postulación.
+        ENCARGADO recibe solo trabajos propios
+        cerrados y sus asistencias. Orden estable por fecha e ID.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Historial paginado según el rol
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/HistorialBecario'
+                  - $ref: '#/components/schemas/HistorialEncargado'
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/progress:
+    get:
+      tags: [Control]
+      operationId: consultarProgresoEstudiantes
+      summary: Consulta el progreso de estudiantes para supervisión administrativa
+      description: Solo ADMIN. Filtra por texto y por si quedan minutos pendientes; incluye cuentas inactivas para conservar la consulta histórica.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: conHorasPendientes
+          in: query
+          description: Si es true devuelve estudiantes con horas pendientes; si es false devuelve quienes alcanzaron o superaron su meta.
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Progreso paginado por estudiante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgresoEstudiantes' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/{id}/history:
+    get:
+      tags: [Control]
+      operationId: consultarHistorialEstudiante
+      summary: Consulta el historial de un estudiante
+      description: Solo ADMIN. Incluye postulaciones, asistencias, ausencias y acreditación persistida.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Historial paginado del estudiante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistorialBecario' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: mibeca_session
+
+  parameters:
+    UsuarioId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    CsrfToken:
+      name: X-CSRF-Token
+      in: header
+      required: true
+      description: Token CSRF de la sesión; se obtiene en la respuesta de login o en `GET /auth/me`.
+      schema: { type: string, minLength: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Clave estable por intento de cierre y única por encargado.
+      schema: { type: string, minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9._-]+$' }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
+
+  responses:
+    ErrorValidacion:
+      description: Entrada inválida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ErrorNoAutorizado:
+      description: Sin sesión válida
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ErrorProhibido:
+      description: El rol no permite la operación
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ErrorNoEncontrado:
+      description: Recurso inexistente
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ErrorConflicto:
+      description: Conflicto de estado o unicidad
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    ErrorDemasiadosIntentos:
+      description: Demasiados intentos de inicio de sesión
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+
+  schemas:
+    TrabajoInput:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "titulo"
+        - "descripcion"
+        - "ubicacion"
+        - "inicioPrevisto"
+        - "finPrevisto"
+        - "duracionMinutos"
+        - "cupos"
+      properties:
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+    TrabajoPatch:
+      type: "object"
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+    Trabajo:
+      type: "object"
+      required:
+        - "id"
+        - "encargadoId"
+        - "encargadoNombre"
+        - "titulo"
+        - "descripcion"
+        - "ubicacion"
+        - "inicioPrevisto"
+        - "finPrevisto"
+        - "duracionMinutos"
+        - "cupos"
+        - "contextoTipo"
+        - "contextoNombre"
+        - "estado"
+        - "faseTemporal"
+        - "aceptados"
+        - "cuposDisponibles"
+        - "creadoEn"
+        - "actualizadoEn"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        encargadoId:
+          type: "string"
+          format: "uuid"
+        encargadoNombre:
+          type: "string"
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+        contextoTipo:
+          type: "string"
+          enum:
+            - "MATERIA"
+            - "FACULTAD"
+            - "AREA"
+        contextoNombre:
+          type: "string"
+        estado:
+          type: "string"
+          enum:
+            - "PUBLICADO"
+            - "CERRADO"
+        faseTemporal:
+          type: "string"
+          enum:
+            - "PROXIMO"
+            - "EN_CURSO"
+            - "FINALIZADO"
+            - "CERRADO"
+        aceptados:
+          type: "integer"
+          minimum: 0
+        cuposDisponibles:
+          type: "integer"
+          minimum: 0
+        creadoEn:
+          type: "string"
+          format: "date-time"
+        actualizadoEn:
+          type: "string"
+          format: "date-time"
+    Postulacion:
+      type: "object"
+      required:
+        - "id"
+        - "trabajoId"
+        - "estudianteId"
+        - "estado"
+        - "creadoEn"
+        - "actualizadoEn"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        trabajoId:
+          type: "string"
+          format: "uuid"
+        estudianteId:
+          type: "string"
+          format: "uuid"
+        estado:
+          type: "string"
+          enum:
+            - "PENDIENTE"
+            - "ACEPTADA"
+            - "RECHAZADA"
+        creadoEn:
+          type: "string"
+          format: "date-time"
+        actualizadoEn:
+          type: "string"
+          format: "date-time"
+    PostulacionConEstudiante:
+      allOf:
+        -
+          $ref: "#/components/schemas/Postulacion"
+        -
+          type: "object"
+          required:
+            - "estudiante"
+          properties:
+            estudiante:
+              type: "object"
+              additionalProperties: false
+              required:
+                - "nombre"
+                - "codigo"
+                - "carrera"
+              properties:
+                nombre:
+                  type: "string"
+                codigo:
+                  type: "string"
+                  pattern: "^[0-9]{5}$"
+                carrera:
+                  type: "string"
+    PostulacionConTrabajo:
+      allOf:
+        -
+          $ref: "#/components/schemas/Postulacion"
+        -
+          type: "object"
+          required:
+            - "trabajo"
+          properties:
+            trabajo:
+              $ref: "#/components/schemas/Trabajo"
+
+    CierreInput:
+      type: object
+      additionalProperties: false
+      required: [attendance]
+      properties:
+        attendance:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [applicationId, attended]
+            properties:
+              applicationId: { type: string, format: uuid }
+              attended: { type: boolean }
+    Asistencia:
+      type: object
+      required: [applicationId, attended, awardedMinutes]
+      properties:
+        applicationId: { type: string, format: uuid }
+        attended: { type: boolean }
+        awardedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    AsistenciaDetallada:
+      allOf:
+        - $ref: '#/components/schemas/Asistencia'
+        - type: object
+          required: [student]
+          properties:
+            student:
+              type: object
+              additionalProperties: false
+              required: [name, code, career]
+              properties:
+                name: { type: string }
+                code: { type: string, pattern: '^[0-9]{5}$' }
+                career: { type: string }
+    Cierre:
+      type: object
+      additionalProperties: false
+      required: [job, attendance, closedAt]
+      properties:
+        job: { $ref: '#/components/schemas/Trabajo' }
+        attendance:
+          type: array
+          items: { $ref: '#/components/schemas/Asistencia' }
+        closedAt: { type: string, format: date-time }
+    Progreso:
+      type: object
+      additionalProperties: false
+      required: [targetMinutes, accreditedMinutes, remainingMinutes, excessMinutes]
+      properties:
+        targetMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    ProgresoEstudiantes:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, email, code, career, semester, targetMinutes, accreditedMinutes, remainingMinutes, excessMinutes]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              email: { type: string, format: email }
+              code: { type: string, pattern: '^[0-9]{5}$' }
+              career: { type: string }
+              semester: { type: integer, minimum: 1 }
+              targetMinutes: { type: integer, minimum: 6, multipleOf: 6 }
+              accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        meta: { $ref: '#/components/schemas/Paginado' }
+    ResumenEncargado:
+      type: object
+      additionalProperties: false
+      required: [totalJobs, publishedJobs, closedJobs, pendingCloseJobs, pendingApplications, acceptedStudents]
+      properties:
+        totalJobs: { type: integer, minimum: 0 }
+        publishedJobs: { type: integer, minimum: 0 }
+        closedJobs: { type: integer, minimum: 0 }
+        pendingCloseJobs: { type: integer, minimum: 0 }
+        pendingApplications: { type: integer, minimum: 0 }
+        acceptedStudents: { type: integer, minimum: 0 }
+    HistorialBecario:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [applicationId, applicationStatus, attended, awardedMinutes, job]
+            properties:
+              applicationId: { type: string, format: uuid }
+              applicationStatus: { type: string, enum: [PENDIENTE, ACEPTADA, RECHAZADA] }
+              attended: { type: [boolean, 'null'] }
+              awardedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              job: { $ref: '#/components/schemas/Trabajo' }
+        meta: { $ref: '#/components/schemas/Paginado' }
+    HistorialEncargado:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [job, closedAt, attendance]
+            properties:
+              job: { $ref: '#/components/schemas/Trabajo' }
+              closedAt: { type: string, format: date-time }
+              attendance:
+                type: array
+                items: { $ref: '#/components/schemas/AsistenciaDetallada' }
+        meta: { $ref: '#/components/schemas/Paginado' }
+
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code: { type: string, example: 'validation_error' }
+            message: { type: string, example: 'La solicitud no es válida.' }
+            detalles:
+              type: array
+              items: { type: string }
+
+    Paginado:
+      type: object
+      required: [page, pageSize, total, totalPages]
+      properties:
+        page: { type: integer, minimum: 1 }
+        pageSize: { type: integer, minimum: 1, maximum: 50 }
+        total: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+
+    SesionActual:
+      type: object
+      required: [usuario, requiereCambioPassword, csrfToken]
+      properties:
+        usuario: { $ref: '#/components/schemas/Usuario' }
+        requiereCambioPassword: { type: boolean }
+        csrfToken:
+          type: string
+          description: Valor para la cabecera `X-CSRF-Token` en escrituras.
+
+    Usuario:
+      type: object
+      required: [id, nombre, correo, rol, activo, requiereCambioPassword, creadoEn]
+      properties:
+        id: { type: string, format: uuid }
+        nombre: { type: string }
+        correo: { type: string, format: email }
+        rol: { type: string, enum: [ADMIN, ENCARGADO, BECARIO] }
+        activo: { type: boolean }
+        requiereCambioPassword: { type: boolean }
+        estudiante:
+          oneOf:
+            - $ref: '#/components/schemas/PerfilEstudiante'
+            - type: 'null'
+        encargado:
+          oneOf:
+            - $ref: '#/components/schemas/PerfilEncargado'
+            - type: 'null'
+        creadoEn: { type: string, format: date-time }
+        actualizadoEn: { type: string, format: date-time }
+
+    PerfilEstudiante:
+      type: object
+      required: [codigo, carrera, semestre, metaMinutos]
+      properties:
+        codigo: { type: string, pattern: '^[0-9]{5}$', example: '00731' }
+        carrera: { type: string }
+        semestre: { type: integer, minimum: 1, maximum: 12 }
+        metaMinutos: { type: integer, minimum: 6, description: Múltiplo de 6. }
+
+    PerfilEncargado:
+      type: object
+      required: [contextoTipo, contextoNombre]
+      properties:
+        contextoTipo: { type: string, enum: [MATERIA, FACULTAD, AREA] }
+        contextoNombre: { type: string }
+
+    PerfilEstudianteInput:
+      type: object
+      required: [codigo, carrera, semestre, metaMinutos]
+      properties:
+        codigo: { type: string, pattern: '^[0-9]{5}$' }
+        carrera: { type: string, minLength: 2, maxLength: 120 }
+        semestre: { type: integer, minimum: 1, maximum: 12 }
+        metaMinutos: { type: integer, minimum: 6 }
+
+    PerfilEncargadoInput:
+      type: object
+      required: [contextoTipo, contextoNombre]
+      properties:
+        contextoTipo: { type: string, enum: [MATERIA, FACULTAD, AREA] }
+        contextoNombre: { type: string, minLength: 2, maxLength: 120 }
+
+    NuevoUsuario:
+      type: object
+      required: [nombre, correo, rol]
+      additionalProperties: false
+      properties:
+        nombre: { type: string, minLength: 3, maxLength: 120 }
+        correo: { type: string, format: email }
+        rol: { type: string, enum: [ADMIN, ENCARGADO, BECARIO] }
+        estudiante: { $ref: '#/components/schemas/PerfilEstudianteInput' }
+        encargado: { $ref: '#/components/schemas/PerfilEncargadoInput' }
+
+    EditarUsuario:
+      type: object
+      additionalProperties: false
+      description: Todos los campos son opcionales; enviar `rol` es un error 400.
+      properties:
+        nombre: { type: string, minLength: 3, maxLength: 120 }
+        correo: { type: string, format: email }
+        estudiante: { $ref: '#/components/schemas/PerfilEstudianteInput' }
+        encargado: { $ref: '#/components/schemas/PerfilEncargadoInput' }

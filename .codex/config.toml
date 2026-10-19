@@ -1,0 +1,12 @@
+# Config de Codex del backend MiBeca.
+#
+# Se combina con la config global de Codex. Este archivo solo fija lo propio del
+# backend: el MCP de Postman para probar el contrato de docs/api-v1.md contra la
+# API local, con el mismo pin que usa OpenCode (opencode.json de este repo).
+#
+# La API key se hereda del entorno (env_vars): no se escribe en este archivo.
+
+[mcp_servers.postman]
+command = "C:/Program Files/nodejs/npx.cmd"
+args = ["-y", "@postman/postman-mcp-server@2.14.0"]
+env_vars = ["POSTMAN_API_KEY"]
