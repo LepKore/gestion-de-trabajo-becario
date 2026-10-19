@@ -152,6 +152,8 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 
 **Aceptación:** dashboards consumen datos reales y respetan alcance por rol, móvil y teclado.
 
+**Estado (19-10-2026): implementada; verificación automatizada parcial.** Rutas, paneles por rol y pruebas de unidad/frontend están en `VERIFICACION_FASE_5.md`. Las pruebas backend que requieren PostgreSQL local y el lint del contrato quedan pendientes por limitaciones del entorno.
+
 ## Fase 6 — Calidad, CI/CD y operación
 
 1. Pruebas backend prioritarias:

@@ -1,6 +1,6 @@
 # MiBeca API v1 — resumen subordinado al contrato
 
-**Estado (19-10-2026): Auth, Usuarios, Trabajos, Postulaciones y Control están implementados y verificados en local.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.2.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
+**Estado (19-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control y Supervisión están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.3.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
 
 ## Convenciones acordadas
 
@@ -26,7 +26,8 @@ Todas reciben el prefijo `/api/v1`. La columna «Estado» distingue lo implement
 | Postulaciones | `POST /applications/{id}/accept`, `POST /applications/{id}/reject` | Encargado propietario antes del inicio; aceptación con control transaccional de cupo. | Implementado |
 | Consultas propias | `GET /me/applications`, `GET /me/jobs` | Según rol y propiedad. | Implementado |
 | Control propio | `GET /me/progress`, `GET /me/history` | Según rol y propiedad; progreso solo de becario. | Implementado |
-| Supervisión | `GET /students/progress`, `GET /students/{id}/history` | Solo administrador. | Previsto |
+| Resumen encargado | `GET /me/dashboard` | Solo encargado; agrega únicamente sus trabajos. | Implementado |
+| Supervisión | `GET /students/progress`, `GET /students/{id}/history` | Solo administrador. | Implementado |
 
 El cierre recibe una lista exhaustiva de `{applicationId, attended}` para todos los aceptados y la cabecera `Idempotency-Key`. El servidor toma los minutos del trabajo; el cliente no decide horas acreditadas. Los ausentes reciben cero y permanecen en el historial. Las postulaciones pendientes se rechazan con `motivo_rechazo=CIERRE_TRABAJO`. La misma clave y contenido devuelve el resultado original, mientras una clave reutilizada con contenido distinto o un cierre nuevo devuelven 409. No hay retiro de postulaciones, jornadas parciales, `completionId`, ruta de acreditación individual ni edición posterior de horas en el MVP.
 
@@ -42,6 +43,6 @@ Estos resúmenes no sustituyen a `openapi.yaml`:
 - `PATCH /users/{id}` edita nombre, correo y campos del perfil; enviar `rol` devuelve 400.
 - Desactivar y restablecer contraseña revocan las sesiones del usuario. Reactivar no revive sesiones anteriores. Desactivar al último administrador activo devuelve 409 `ultimo_admin_activo`.
 
-## Pendiente del MVP
+## Fase 5 implementada
 
-La consulta administrativa de progreso e historial corresponde a fase 5. El cierre y las consultas propias se especifican en `openapi.yaml` 1.2.0; su evidencia está en `VERIFICACION_FASE_4.md`. Ningún formulario frontend debe suponer disponible una ruta marcada como prevista.
+La supervisión administrativa y los dashboards por rol están implementados en OpenAPI 1.3.0. La evidencia y los límites de verificación se documentan en `VERIFICACION_FASE_5.md` y el contrato canónico `openapi.yaml`.
