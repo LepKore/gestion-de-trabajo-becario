@@ -36,6 +36,14 @@ jobs:
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm run db:migrate:env
+      - name: Validar contrato OpenAPI
+        run: npx --yes @redocly/cli@latest lint openapi.yaml
+      - name: Pruebas de API
+        env:
+          TEST_DATABASE_URL: postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_test
+        run: |
+          node scripts/create-test-database.js
+          npm test
       - name: Comprobar disponibilidad de API y PostgreSQL
         run: |
           npm start &

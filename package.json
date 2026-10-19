@@ -8,12 +8,21 @@
   },
   "scripts": {
     "dev": "node --env-file=.env src/server.js",
-    "start": "node src/server.js",
+    "build": "npm run check",
+    "start": "node --env-file-if-exists=.env src/server.js",
     "db:migrate": "node --env-file=.env scripts/migrate.js",
     "db:migrate:env": "node scripts/migrate.js",
-    "check": "node --check src/db.js && node --check src/server.js && node --check scripts/migrate.js"
+    "db:create-admin": "node --env-file=.env scripts/create-admin.js",
+    "db:bootstrap-admin": "node --env-file=.env scripts/bootstrap-admin.js",
+    "test": "node --env-file-if-exists=.env --test \"test/*.test.js\"",
+    "check": "node scripts/check-syntax.js"
   },
   "dependencies": {
-    "pg": "^8.16.3"
+    "argon2": "^0.45.1",
+    "cookie-parser": "^1.4.7",
+    "express": "^5.3.0",
+    "helmet": "^8.3.0",
+    "pg": "^8.16.3",
+    "zod": "^4.6.7"
   }
 }

@@ -33,9 +33,37 @@ npm run db:migrate
 npm run dev
 ```
 
-`npm run db:migrate` conecta con `DATABASE_URL`, comprueba que `MIGRATION_TARGET=local` apunte a localhost y aplica los archivos `migrations/*.sql` pendientes en orden. Hoy no hay migraciones de producto; solo se crea `schema_migrations` para registrar futuras versiones. Antes de aplicar una migración, revisa el SQL y el host de `DATABASE_URL`. Nunca se ejecutan migraciones al iniciar la API.
+`npm run db:migrate` conecta con `DATABASE_URL`, comprueba que `MIGRATION_TARGET=local` apunte a localhost y aplica los archivos `migrations/*.sql` pendientes en orden. La migración `0001_init.sql` crea el esquema de la fase 2 (`usuarios`, `estudiantes`, `encargados`, `sesiones`, `auditoria`); los archivos ya aplicados no se editan. Antes de aplicar una migración, revisa el SQL y el host de `DATABASE_URL`. Nunca se ejecutan migraciones al iniciar la API.
 
-`GET http://127.0.0.1:3000/health` confirma que el proceso responde. `GET http://127.0.0.1:3000/ready` ejecuta `SELECT 1` y devuelve 503 si PostgreSQL no está disponible. `CORS_ORIGIN` acepta orígenes separados por comas; en local se usa el origen de Vite. El backend aún no implementa autenticación ni rutas de negocio.
+`GET http://127.0.0.1:3000/health` confirma que el proceso responde. `GET http://127.0.0.1:3000/ready` ejecuta `SELECT 1` y devuelve 503 si PostgreSQL no está disponible. `CORS_ORIGIN` acepta orígenes separados por comas; en local se usa el origen de Vite.
+
+El backend implementa la fase 2 (Auth y Usuarios) bajo `/api/v1`. El contrato canónico es [`openapi.yaml`](openapi.yaml); `docs/api-v1.md` es un resumen subordinado. Las rutas de trabajos, postulaciones y control (fases 3 y 4) todavía no existen.
+
+## Primer administrador
+
+No hay registro público: las cuentas las crea el administrador. El primer ADMIN se genera con un comando explícito, nunca al migrar ni al arrancar el servidor.
+
+```bash
+npm run db:create-admin
+```
+
+Pide nombre, correo y una confirmación, y muestra una contraseña temporal **una sola vez**. Con el mismo destino y destino ya existente se puede usar la variante sin interacción:
+
+```bash
+npm run db:bootstrap-admin
+```
+
+Lee `BOOTSTRAP_ADMIN_NOMBRE`, `BOOTSTRAP_ADMIN_CORREO` y `BOOTSTRAP_ADMIN_PASSWORD` (vacío = genera una temporal y la imprime una vez). Es idempotente: si ya existe un administrador activo no crea nada. Para entornos nuevos se define el administrador inicial con SQL, sin credenciales predeterminadas en Git ni en logs. Al crear una cuenta, la contraseña temporal se entrega en persona y el usuario debe cambiarla antes de entrar al negocio.
+
+## Pruebas y verificación
+
+```bash
+npm run check
+npm test
+npx @redocly/cli@latest lint openapi.yaml
+```
+
+`npm run check` valida la sintaxis de los archivos `.js` de `src`, `scripts` y `test`. `npm test` ejecuta la suite de API contra la base `TEST_DATABASE_URL` (25 pruebas): **recrea el esquema public de esa base en cada ejecución**, por lo que nunca debe apuntar a producción; el helper rechaza hosts remotos salvo `TEST_ALLOW_REMOTE=true`. `npm run check`, `npm test` y el lint de `openapi.yaml` son los mismos pasos que ejecuta la CI.
 
 Para detener y volver a crear el contenedor conservando los datos:
 
@@ -63,7 +91,21 @@ Ejecuta `docker compose down` y `docker compose up -d postgres`, vuelve a entrar
 
 Cada integrante tiene su propio contenedor y volumen local; los registros no se sincronizan entre equipos. Git comparte `compose.yaml`, `.env.example`, código, migraciones SQL y, si se necesitan, semillas de desarrollo explícitas. No hay semillas automáticas. Una migración nueva debe tener nombre ordenable (por ejemplo `0001_usuarios.sql`) y no se edita tras aplicarse; el ejecutor comprueba su SHA-256. El equipo acuerda el contrato antes de crear tablas. Las decisiones compartidas se versionan en `docs/`.
 
-La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json`, ejecuta `npm run check`, migraciones y `GET /ready`. No tiene acceso a Render. Aún faltan pruebas del dominio y del contrato; este workflow solo comprueba la infraestructura actual.
+La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json` y ejecuta `npm run check`, las migraciones, el lint de `openapi.yaml` y la suite de API (creando una base `mibeca_test` efímera y exponiéndola como `TEST_DATABASE_URL`). No tiene acceso a Render ni a Supabase. Las rutas de las fases 3 y 4 todavía no tienen pruebas porque todavía no existen.
+
+## Comandos de build y de arranque en despliegue
+
+El backend es JavaScript sin compilación, así que `build` no transpila nada: ejecuta la verificación de sintaxis (`npm run check`, un `node --check` por archivo). Ese es el único paso que la plataforma debe ejecutar antes de arrancar.
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm ci` | Instala dependencias exactas desde `package-lock.json`. |
+| `npm run build` | Verifica la sintaxis de `src/`, `scripts/` y `test/`. No genera artefactos. |
+| `npm start` | Arranca la API con `node --env-file-if-exists=.env src/server.js`. Carga `.env` solo si existe, y cualquier variable ya definida en el entorno tiene prioridad sobre el archivo. |
+
+En local, `npm start` y `npm run dev` leen el mismo `.env`, así que ambos funcionan sin configurar nada a mano. En el proveedor de despliegue no existe `.env`: mandan sus variables, que además prevalecen sobre el archivo si algún día apareciera uno.
+
+Variables que el proveedor debe inyectar: `DATABASE_URL`, `HOST=0.0.0.0`, `PORT`, `CORS_ORIGIN` con el dominio real del frontend y, por defecto, `NODE_ENV=production` (activa `COOKIE_SECURE=true`). Las migraciones se aplican aparte con `npm run db:migrate:env`; ver "Conectar con Supabase (despliegue)". El primer administrador se crea con `npm run db:bootstrap-admin`, una sola vez.
 
 ## Conectar con Supabase (despliegue)
 
