@@ -5,6 +5,13 @@ on:
   push:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
     runs-on: ubuntu-latest
@@ -37,7 +44,7 @@ jobs:
       - run: npm run check
       - run: npm run db:migrate:env
       - name: Validar contrato OpenAPI
-        run: npx --yes @redocly/cli@latest lint openapi.yaml
+         run: npx --yes @redocly/cli@1.34.2 lint openapi.yaml
       - name: Pruebas de API
         env:
           TEST_DATABASE_URL: postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_test

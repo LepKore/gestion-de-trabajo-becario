@@ -267,10 +267,19 @@ export function blocked(command, cwd, backend, composeFiles) {
 export function reasonText(condition) {
   return (
     `Hook local MiBeca: operacion rechazada por ${condition}. ` +
-    "Detener o recrear sin -v esta permitido. Si una persona autoriza borrar " +
-    "datos, debe revisar destino y respaldo y ejecutar la orden manualmente " +
-    "fuera del agente; el agente no puede cambiar este control para pasar."
+    "Revisa el destino y ejecuta operaciones remotas o destructivas manualmente " +
+    "fuera del agente con autorizacion explicita; el agente no puede cambiar este " +
+    "control para pasar."
   );
+}
+
+export function blockedMigration(command) {
+  const lowered = command.toLowerCase();
+  const migrationCommands = ["db:migrate", "db:migrate:env", "db:create-admin", "db:bootstrap-admin"];
+  if (!migrationCommands.some((item) => lowered.includes(item))) return null;
+  if (lowered.includes("migration_target=local") && !lowered.includes("supabase") && !lowered.includes("render")) return null;
+  if (lowered.includes("localhost") || lowered.includes("127.0.0.1") || lowered.includes("::1")) return null;
+  return "migración u operación administrativa con destino no local";
 }
 
 export const DockerGuard = async ({ directory, worktree }) => {
@@ -287,9 +296,10 @@ export const DockerGuard = async ({ directory, worktree }) => {
 
       const cwd = pathOf(args.workdir || root, normalizePath(root));
       const condition = blocked(command, cwd, backend, composeFiles);
-      if (condition === null) return;
+      const migrationCondition = blockedMigration(command);
+      if (condition === null && migrationCondition === null) return;
 
-      throw new Error(reasonText(condition));
+      throw new Error(reasonText(condition || migrationCondition));
     },
   };
 };
