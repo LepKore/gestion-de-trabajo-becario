@@ -31,9 +31,12 @@ if (files.length === 0) {
   process.exit(1)
 }
 
-const code = await new Promise((resolve) => {
-  spawn(process.execPath, ['--check', ...files], { stdio: 'inherit' }).on('exit', resolve)
-})
-
-if (code === 0) console.log(`Sintaxis correcta en ${files.length} archivos.`)
-process.exit(code)
+// --check procesa un solo archivo por proceso; pasar todos solo comprueba el primero.
+for (const file of files) {
+  const code = await new Promise((resolve, reject) => {
+    spawn(process.execPath, ['--check', file], { stdio: 'inherit' })
+      .on('error', reject).on('exit', resolve)
+  })
+  if (code !== 0) process.exit(code ?? 1)
+}
+console.log(`Sintaxis correcta en ${files.length} archivos.`)

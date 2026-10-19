@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.0.0
+  version: 1.1.0
   description: >-
-    Contrato canónico de MiBeca. Esta revisión cubre Auth y Usuarios (Fase 2);
-    Trabajos, Postulaciones y Control (Fases 3 y 4) se añadirán después.
+    Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos
+    y Postulaciones (fases 2 y 3 del plan de trabajo). Control es fase 4.
     Convenciones: prefijo /api/v1, JSON UTF-8, UUID, fechas UTC, duraciones en
     minutos enteros. Éxitos envueltos en `data`; errores con `code` y `message`.
   license:
@@ -18,6 +18,11 @@ tags:
     description: Inicio y fin de sesión, y cambio de contraseña.
   - name: Usuarios
     description: Administración de cuentas, exclusiva del administrador.
+
+  - name: Trabajos
+    description: Publicación y consulta de trabajos y condiciones.
+  - name: Postulaciones
+    description: Postulación propia y decisiones del propietario con cupos seguros.
 
 paths:
   /auth/login:
@@ -363,6 +368,517 @@ paths:
         '403': { $ref: '#/components/responses/ErrorProhibido' }
         '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
 
+  /jobs:
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "listarTrabajos"
+      summary: "Consulta trabajos publicados y cerrados"
+      description: "Todos los roles autenticados sin cambio de contraseña pendiente. Incluye disponibilidad calculada; orden estable por fecha e ID."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PUBLICADO"
+              - "CERRADO"
+        -
+          name: "q"
+          in: "query"
+          schema:
+            type: "string"
+            minLength: 1
+            maxLength: 100
+      responses:
+        200:
+          description: "Consulta trabajos publicados y cerrados"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Trabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    post:
+      tags:
+        - "Trabajos"
+      operationId: "crearTrabajo"
+      summary: "Publica un trabajo propio"
+      description: "Solo ENCARGADO activo. Inicio futuro y fin posterior. Copia el contexto del encargado al publicar. Duración explícita, nunca calculada a partir del reloj."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        201:
+          description: "Publica un trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/TrabajoInput"
+  /jobs/{id}:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "consultarTrabajo"
+      summary: "Consulta un trabajo"
+      description: "Disponible a los tres roles autenticados; no incluye datos personales de postulantes."
+      security:
+        -
+          cookieAuth: []
+      parameters: []
+      responses:
+        200:
+          description: "Consulta un trabajo"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    patch:
+      tags:
+        - "Trabajos"
+      operationId: "editarTrabajo"
+      summary: "Edita condiciones de un trabajo propio"
+      description: "Solo ENCARGADO propietario, antes del inicio y antes de cualquier aceptación. Comprueba los campos combinados con valores existentes. Serializa edición y aceptación; 409 si condiciones fijadas, 403 si ajeno."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Edita condiciones de un trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Trabajo"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              $ref: "#/components/schemas/TrabajoPatch"
+  /jobs/{id}/applications:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    get:
+      tags:
+        - "Postulaciones"
+      operationId: "listarPostulantes"
+      summary: "Lista postulantes del trabajo propio"
+      description: "Solo ENCARGADO propietario. Datos del estudiante limitados a nombre, código y carrera. Otros roles o propietario ajeno reciben 403."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PENDIENTE"
+              - "ACEPTADA"
+              - "RECHAZADA"
+      responses:
+        200:
+          description: "Lista postulantes del trabajo propio"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PostulacionConEstudiante"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "postularTrabajo"
+      summary: "Postula al becario autenticado"
+      description: "Solo BECARIO activo, trabajo PUBLICADO antes del inicio con cupo disponible. PENDIENTE no reserva cupo. Una postulación por estudiante/trabajo; duplicados devuelven 409."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        201:
+          description: "Postula al becario autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /applications/{id}/accept:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "aceptarPostulacion"
+      summary: "Acepta una postulación pendiente"
+      description: "Solo ENCARGADO propietario antes del inicio. Comprueba cuenta del estudiante activa y cupo dentro de transacción con bloqueo del trabajo; dos aceptaciones sobre el último cupo producen un éxito y un conflicto. Decisión irreversible."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Acepta una postulación pendiente"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /applications/{id}/reject:
+    parameters:
+      -
+        $ref: "#/components/parameters/UsuarioId"
+    post:
+      tags:
+        - "Postulaciones"
+      operationId: "rechazarPostulacion"
+      summary: "Rechaza una postulación pendiente"
+      description: "Solo ENCARGADO propietario antes del inicio. No permite revertir decisiones ni borrar historial. 409 si trabajo iniciado/cerrado o postulación ya decidida."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          $ref: "#/components/parameters/CsrfToken"
+      responses:
+        200:
+          description: "Rechaza una postulación pendiente"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                properties:
+                  data:
+                    $ref: "#/components/schemas/Postulacion"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+      requestBody:
+        required: true
+        content:
+          "application/json":
+            schema:
+              type: "object"
+              additionalProperties: false
+  /me/jobs:
+    get:
+      tags:
+        - "Trabajos"
+      operationId: "listarTrabajosPropios"
+      summary: "Lista trabajos del encargado autenticado"
+      description: "Solo ENCARGADO. Nunca permite seleccionar otro propietario."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PUBLICADO"
+              - "CERRADO"
+        -
+          name: "q"
+          in: "query"
+          schema:
+            type: "string"
+            minLength: 1
+            maxLength: 100
+      responses:
+        200:
+          description: "Lista trabajos del encargado autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/Trabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+  /me/applications:
+    get:
+      tags:
+        - "Postulaciones"
+      operationId: "listarPostulacionesPropias"
+      summary: "Lista postulaciones del becario autenticado"
+      description: "Solo BECARIO. Incluye trabajo y estado de cada postulación; no permite seleccionar otro estudiante."
+      security:
+        -
+          cookieAuth: []
+      parameters:
+        -
+          name: "page"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            default: 1
+        -
+          name: "pageSize"
+          in: "query"
+          schema:
+            type: "integer"
+            minimum: 1
+            maximum: 50
+            default: 20
+        -
+          name: "estado"
+          in: "query"
+          schema:
+            type: "string"
+            enum:
+              - "PENDIENTE"
+              - "ACEPTADA"
+              - "RECHAZADA"
+      responses:
+        200:
+          description: "Lista postulaciones del becario autenticado"
+          content:
+            "application/json":
+              schema:
+                type: "object"
+                required:
+                  - "data"
+                  - "meta"
+                properties:
+                  data:
+                    type: "array"
+                    items:
+                      $ref: "#/components/schemas/PostulacionConTrabajo"
+                  meta:
+                    $ref: "#/components/schemas/Paginado"
+        400:
+          $ref: "#/components/responses/ErrorValidacion"
+        401:
+          $ref: "#/components/responses/ErrorNoAutorizado"
+        403:
+          $ref: "#/components/responses/ErrorProhibido"
+        404:
+          $ref: "#/components/responses/ErrorNoEncontrado"
+        409:
+          $ref: "#/components/responses/ErrorConflicto"
+
 components:
   securitySchemes:
     cookieAuth:
@@ -416,6 +932,236 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    TrabajoInput:
+      type: "object"
+      additionalProperties: false
+      required:
+        - "titulo"
+        - "descripcion"
+        - "ubicacion"
+        - "inicioPrevisto"
+        - "finPrevisto"
+        - "duracionMinutos"
+        - "cupos"
+      properties:
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+    TrabajoPatch:
+      type: "object"
+      additionalProperties: false
+      minProperties: 1
+      properties:
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+    Trabajo:
+      type: "object"
+      required:
+        - "id"
+        - "encargadoId"
+        - "encargadoNombre"
+        - "titulo"
+        - "descripcion"
+        - "ubicacion"
+        - "inicioPrevisto"
+        - "finPrevisto"
+        - "duracionMinutos"
+        - "cupos"
+        - "contextoTipo"
+        - "contextoNombre"
+        - "estado"
+        - "faseTemporal"
+        - "aceptados"
+        - "cuposDisponibles"
+        - "creadoEn"
+        - "actualizadoEn"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        encargadoId:
+          type: "string"
+          format: "uuid"
+        encargadoNombre:
+          type: "string"
+        titulo:
+          type: "string"
+          minLength: 3
+          maxLength: 120
+        descripcion:
+          type: "string"
+          minLength: 3
+          maxLength: 4000
+        ubicacion:
+          type: "string"
+          minLength: 2
+          maxLength: 200
+        inicioPrevisto:
+          type: "string"
+          format: "date-time"
+          description: "Instante ISO 8601 con zona explícita; respuestas en UTC."
+        finPrevisto:
+          type: "string"
+          format: "date-time"
+        duracionMinutos:
+          type: "integer"
+          minimum: 6
+          maximum: 2147483646
+          multipleOf: 6
+        cupos:
+          type: "integer"
+          minimum: 1
+          maximum: 2147483647
+        contextoTipo:
+          type: "string"
+          enum:
+            - "MATERIA"
+            - "FACULTAD"
+            - "AREA"
+        contextoNombre:
+          type: "string"
+        estado:
+          type: "string"
+          enum:
+            - "PUBLICADO"
+            - "CERRADO"
+        faseTemporal:
+          type: "string"
+          enum:
+            - "PROXIMO"
+            - "EN_CURSO"
+            - "FINALIZADO"
+            - "CERRADO"
+        aceptados:
+          type: "integer"
+          minimum: 0
+        cuposDisponibles:
+          type: "integer"
+          minimum: 0
+        creadoEn:
+          type: "string"
+          format: "date-time"
+        actualizadoEn:
+          type: "string"
+          format: "date-time"
+    Postulacion:
+      type: "object"
+      required:
+        - "id"
+        - "trabajoId"
+        - "estudianteId"
+        - "estado"
+        - "creadoEn"
+        - "actualizadoEn"
+      properties:
+        id:
+          type: "string"
+          format: "uuid"
+        trabajoId:
+          type: "string"
+          format: "uuid"
+        estudianteId:
+          type: "string"
+          format: "uuid"
+        estado:
+          type: "string"
+          enum:
+            - "PENDIENTE"
+            - "ACEPTADA"
+            - "RECHAZADA"
+        creadoEn:
+          type: "string"
+          format: "date-time"
+        actualizadoEn:
+          type: "string"
+          format: "date-time"
+    PostulacionConEstudiante:
+      allOf:
+        -
+          $ref: "#/components/schemas/Postulacion"
+        -
+          type: "object"
+          required:
+            - "estudiante"
+          properties:
+            estudiante:
+              type: "object"
+              additionalProperties: false
+              required:
+                - "nombre"
+                - "codigo"
+                - "carrera"
+              properties:
+                nombre:
+                  type: "string"
+                codigo:
+                  type: "string"
+                  pattern: "^[0-9]{5}$"
+                carrera:
+                  type: "string"
+    PostulacionConTrabajo:
+      allOf:
+        -
+          $ref: "#/components/schemas/Postulacion"
+        -
+          type: "object"
+          required:
+            - "trabajo"
+          properties:
+            trabajo:
+              $ref: "#/components/schemas/Trabajo"
+
     Error:
       type: object
       required: [error]

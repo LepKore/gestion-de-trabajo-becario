@@ -7,20 +7,20 @@ import { createApp } from '../src/app.js'
 // Infraestructura de pruebas: base propia, esquema recreado desde las
 // migraciones y un cliente HTTP con tarro de cookies.
 
-// Las pruebas borran y recrean el esquema del destino. Por eso se niegan a
-// correr contra un host que no sea local, salvo que se autorice explícitamente.
+// Las pruebas borran y recrean el esquema: requieren base local de pruebas
+// explícita. Nunca se permite usar DATABASE_URL como destino implícito.
 export function assertTestDatabase(url) {
   const localHosts = new Set(['localhost', '127.0.0.1', '[::1]'])
-  if (!localHosts.has(url.hostname) && process.env.TEST_ALLOW_REMOTE !== 'true') {
+  if (!localHosts.has(url.hostname) || !/^mibeca(?:_[a-z0-9]+)*_test(?:_[a-z0-9]+)*$/.test(url.pathname.slice(1))) {
     throw new Error(
-      'Las pruebas recrean el esquema. Define TEST_ALLOW_REMOTE=true solo para una base de pruebas descartable.',
+      'Las pruebas requieren una base local descartable llamada mibeca*_test*. No se admiten destinos remotos.',
     )
   }
 }
 
-export function databaseUrl() {
-  const url = process.env.TEST_DATABASE_URL || process.env.DATABASE_URL
-  if (!url) throw new Error('Define TEST_DATABASE_URL o DATABASE_URL para ejecutar las pruebas')
+export function databaseUrl(env = process.env) {
+  const url = env.TEST_DATABASE_URL
+  if (!url) throw new Error('Define TEST_DATABASE_URL explícitamente para ejecutar las pruebas')
   assertTestDatabase(new URL(url))
   return url
 }
@@ -49,7 +49,7 @@ export function testEnv(overrides = {}) {
 }
 
 export async function startTestServer(env = testEnv()) {
-  const url = env.TEST_DATABASE_URL || env.DATABASE_URL
+  const url = databaseUrl(env)
   const pool = createPool({ ...env, DATABASE_URL: url })
   const { app, config } = createApp({ pool, env })
   const server = app.listen(0, '127.0.0.1')
