@@ -6,7 +6,7 @@
 // muestra una sola vez por consola.
 //jdncjdncndjcnjdnc
 // Uso: npm run db:bootstrap-admin
-//
+//jdsfjvdsjvnjdsnjvds
 // Variables (solo lectura, en .env):
 //   BOOTSTRAP_ADMIN_NOMBRE    nombre completo del administrador inicial
 //   BOOTSTRAP_ADMIN_CORREO    correo institucional; puede cambiarse después por SQL
