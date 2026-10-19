@@ -27,6 +27,48 @@ tags:
     description: Cierre único, asistencia, progreso e historial propios.
 
 paths:
+  /health:
+    get:
+      operationId: health
+      summary: Comprueba que la API está iniciada
+      description: Endpoint público; no comprueba dependencias externas.
+      security: []
+      responses:
+        '200':
+          description: API disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+  /health_db:
+    get:
+      operationId: healthDb
+      summary: Comprueba la conexión con la base de datos
+      description: Endpoint público; ejecuta una consulta mínima en PostgreSQL.
+      security: []
+      responses:
+        '200':
+          description: Base de datos disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, const: ok }
+        '503':
+          description: Base de datos no disponible
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, error]
+                properties:
+                  status: { type: string, const: error }
+                  error: { type: string, const: database_unavailable }
   /auth/login:
     post:
       tags: [Auth]

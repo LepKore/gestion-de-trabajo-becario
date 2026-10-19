@@ -50,6 +50,14 @@ export function createApp({ pool, env = process.env }) {
   }
 
   app.get('/health', (request, response) => response.json({ status: 'ok' }))
+  app.get('/health_db', async (request, response) => {
+    try {
+      await pool.query('SELECT 1')
+      response.json({ status: 'ok' })
+    } catch {
+      response.status(503).json({ status: 'error', error: 'database_unavailable' })
+    }
+  })
   app.get('/ready', async (request, response) => {
     try {
       await pool.query('SELECT 1')
