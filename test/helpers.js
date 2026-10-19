@@ -41,6 +41,7 @@ export function testEnv(overrides = {}) {
     ...process.env,
     NODE_ENV: 'test',
     COOKIE_SECURE: 'false',
+    CORS_ORIGIN: 'http://localhost:5173',
     SESSION_TTL_HOURS: '1',
     LOGIN_MAX_ATTEMPTS: '1000',
     ...overrides,
