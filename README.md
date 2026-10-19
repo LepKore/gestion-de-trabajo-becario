@@ -1,6 +1,6 @@
 # MiBeca — backend
 
-API Node.js y PostgreSQL local de MiBeca. Actualmente existen endpoints de diagnóstico (`GET /health` y `GET /ready`), la conexión configurable y la infraestructura de migraciones. El esquema y las rutas del producto siguen pendientes: no se han creado tablas de usuarios, trabajos u horas sin cerrar antes el contrato del MVP. La propuesta de producto está en [docs/](docs/).
+API Node.js y PostgreSQL de MiBeca. Incluye Auth, Usuarios, Trabajos y Postulaciones bajo `/api/v1`, además de `GET /health` y `GET /ready`. La fase 4 añade cierre, asistencia, progreso e historiales; el alcance y estado se describen en [docs/PLAN_DE_TRABAJO_MIBECA.md](docs/PLAN_DE_TRABAJO_MIBECA.md).
 
 ## Requisitos
 
@@ -33,11 +33,11 @@ npm run db:migrate
 npm run dev
 ```
 
-`npm run db:migrate` conecta con `DATABASE_URL`, comprueba que `MIGRATION_TARGET=local` apunte a localhost y aplica los archivos `migrations/*.sql` pendientes en orden. La migración `0001_init.sql` crea el esquema de la fase 2 (`usuarios`, `estudiantes`, `encargados`, `sesiones`, `auditoria`); los archivos ya aplicados no se editan. Antes de aplicar una migración, revisa el SQL y el host de `DATABASE_URL`. Nunca se ejecutan migraciones al iniciar la API.
+`npm run db:migrate` conecta con `DATABASE_URL`, comprueba que `MIGRATION_TARGET=local` apunte a localhost y aplica los archivos `migrations/*.sql` pendientes en orden. `0001_init.sql` crea Auth y Usuarios; `0002_trabajos_postulaciones.sql` crea el dominio de la fase 3; `0003_cierre_asistencia.sql` añade el control de la fase 4. Los archivos ya aplicados no se editan. Antes de aplicar una migración, revisa el SQL y el host de `DATABASE_URL`. Nunca se ejecutan migraciones al iniciar la API.
 
 `GET http://127.0.0.1:3000/health` confirma que el proceso responde. `GET http://127.0.0.1:3000/ready` ejecuta `SELECT 1` y devuelve 503 si PostgreSQL no está disponible. `CORS_ORIGIN` acepta orígenes separados por comas; en local se usa el origen de Vite.
 
-El backend implementa la fase 2 (Auth y Usuarios) bajo `/api/v1`. El contrato canónico es [`openapi.yaml`](openapi.yaml); `docs/api-v1.md` es un resumen subordinado. Las rutas de trabajos, postulaciones y control (fases 3 y 4) todavía no existen.
+El contrato canónico es [`openapi.yaml`](openapi.yaml), revisión 1.2.0; `docs/api-v1.md` es un resumen subordinado. La API usa sesiones en cookies HttpOnly, CSRF en escrituras y comprobaciones de rol, actividad y propiedad.
 
 ## Primer administrador
 
@@ -53,7 +53,7 @@ Pide nombre, correo y una confirmación, y muestra una contraseña temporal **un
 npm run db:bootstrap-admin
 ```
 
-Lee `BOOTSTRAP_ADMIN_NOMBRE`, `BOOTSTRAP_ADMIN_CORREO` y `BOOTSTRAP_ADMIN_PASSWORD` (vacío = genera una temporal y la imprime una vez). Es idempotente: si ya existe un administrador activo no crea nada. Para entornos nuevos se define el administrador inicial con SQL, sin credenciales predeterminadas en Git ni en logs. Al crear una cuenta, la contraseña temporal se entrega en persona y el usuario debe cambiarla antes de entrar al negocio.
+Lee `BOOTSTRAP_ADMIN_NOMBRE`, `BOOTSTRAP_ADMIN_CORREO` y `BOOTSTRAP_ADMIN_PASSWORD` (vacío = genera una temporal y la imprime una vez). Es idempotente: si ya existe un administrador activo no crea nada. Al crear una cuenta, la contraseña temporal se entrega en persona y el usuario debe cambiarla antes de entrar al negocio.
 
 ## Pruebas y verificación
 
@@ -63,7 +63,7 @@ npm test
 npx @redocly/cli@latest lint openapi.yaml
 ```
 
-`npm run check` valida la sintaxis de los archivos `.js` de `src`, `scripts` y `test`. `npm test` ejecuta la suite de API contra la base `TEST_DATABASE_URL` (25 pruebas): **recrea el esquema public de esa base en cada ejecución**, por lo que nunca debe apuntar a producción; el helper rechaza hosts remotos salvo `TEST_ALLOW_REMOTE=true`. `npm run check`, `npm test` y el lint de `openapi.yaml` son los mismos pasos que ejecuta la CI.
+`npm run check` valida la sintaxis de los archivos `.js` de `src`, `scripts` y `test`. `npm test` ejecuta la suite de API contra `TEST_DATABASE_URL`: **recrea el esquema public de esa base en cada ejecución**. El helper exige un host local y una base llamada `mibeca*_test*`; no acepta destinos remotos. `npm run check`, `npm test` y el lint de `openapi.yaml` son los mismos pasos que ejecuta la CI.
 
 Para detener y volver a crear el contenedor conservando los datos:
 
@@ -91,7 +91,7 @@ Ejecuta `docker compose down` y `docker compose up -d postgres`, vuelve a entrar
 
 Cada integrante tiene su propio contenedor y volumen local; los registros no se sincronizan entre equipos. Git comparte `compose.yaml`, `.env.example`, código, migraciones SQL y, si se necesitan, semillas de desarrollo explícitas. No hay semillas automáticas. Una migración nueva debe tener nombre ordenable (por ejemplo `0001_usuarios.sql`) y no se edita tras aplicarse; el ejecutor comprueba su SHA-256. El equipo acuerda el contrato antes de crear tablas. Las decisiones compartidas se versionan en `docs/`.
 
-La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json` y ejecuta `npm run check`, las migraciones, el lint de `openapi.yaml` y la suite de API (creando una base `mibeca_test` efímera y exponiéndola como `TEST_DATABASE_URL`). No tiene acceso a Render ni a Supabase. Las rutas de las fases 3 y 4 todavía no tienen pruebas porque todavía no existen.
+La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json` y ejecuta `npm run check`, las migraciones, el lint de `openapi.yaml` y la suite de API (creando una base `mibeca_test` efímera y exponiéndola como `TEST_DATABASE_URL`). No tiene acceso a Render ni a Supabase.
 
 ## Comandos de build y de arranque en despliegue
 

@@ -1,6 +1,6 @@
 # MiBeca — Plan unificado de implementación del MVP
 
-Fecha: 18 de octubre de 2026. Versión: 1.0.
+Fecha: 19 de octubre de 2026. Versión: 1.1.
 
 ## 1. Propósito y autoridad del documento
 
@@ -227,16 +227,17 @@ Configurar la URL pública de API en el build frontend y recompilar. Ninguna var
 
 ## 13. Fases de ejecución y criterios
 
+Numeración alineada con `PLAN_DE_TRABAJO_MIBECA.md`: la fase 4 es Control.
+
 | Fase | Entregable y aceptación |
 |---|---|
-| 0. Unificación | Este plan en ambos repositorios, documentos/instrucciones coherentes y estado real diagnosticado. |
-| 1. Entorno verificable | Node y Docker operativos; DB saludable y persistencia tras recrear sin borrar volumen; frontend lint/build. Registrar fallos sin declarar éxito. |
-| 2. Contrato/esquema | OpenAPI validado, estados y respuestas definidos, migración única del dominio revisada. |
-| 3. Auth/Usuarios | Admin inicial, creación de roles, contraseña temporal, login/logout, revocación y formularios conectados. |
-| 4. Trabajos/Postulaciones | Publicar, editar bajo reglas, listar, postular y aceptar/rechazar con cupos seguros. |
-| 5. Control/Progreso | Cierre transaccional, asistencia, horas únicas e historiales reales. |
-| 6. Integración | Tres roles prueban flujo completo, permisos, errores y persistencia; CI pasa. |
-| 7. Publicación | Solo cuando corresponda: nueva DB y backend Render, frontend conectado y validación en navegador. |
+| 0. Contexto y entorno | Planes e instrucciones coherentes, Node/Docker operativos, DB saludable y persistencia tras recrear sin borrar volumen; frontend lint/build. Registrar fallos sin declarar éxito. |
+| 1. Contrato/esquema | OpenAPI validado, estados y respuestas definidos, historial único de migraciones revisado. |
+| 2. Auth/Usuarios | Admin inicial, creación de roles, contraseña temporal, login/logout, revocación y formularios conectados. |
+| 3. Trabajos/Postulaciones | Publicar, editar bajo reglas, listar, postular y aceptar/rechazar con cupos seguros. |
+| 4. Control/Progreso | Cierre transaccional, asistencia, horas únicas e historiales reales. |
+| 5. Dashboards y supervisión | Paneles con datos reales y consulta administrativa de progreso e historial según permisos. |
+| 6. Calidad y operación | Integración de los tres roles, permisos, errores, persistencia y CI; publicación y validación en navegador cuando estén autorizadas. |
 
 ### Pruebas obligatorias del flujo
 

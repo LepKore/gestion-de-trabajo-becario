@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.1.0
+  version: 1.2.0
   description: >-
-    Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos
-    y Postulaciones (fases 2 y 3 del plan de trabajo). Control es fase 4.
+    Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
+    Postulaciones y Control (fases 2 a 4 del plan de trabajo).
     Convenciones: prefijo /api/v1, JSON UTF-8, UUID, fechas UTC, duraciones en
     minutos enteros. Éxitos envueltos en `data`; errores con `code` y `message`.
   license:
@@ -23,6 +23,8 @@ tags:
     description: Publicación y consulta de trabajos y condiciones.
   - name: Postulaciones
     description: Postulación propia y decisiones del propietario con cupos seguros.
+  - name: Control
+    description: Cierre único, asistencia, progreso e historial propios.
 
 paths:
   /auth/login:
@@ -879,6 +881,120 @@ paths:
         409:
           $ref: "#/components/responses/ErrorConflicto"
 
+  /jobs/{id}/close:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    post:
+      tags: [Control]
+      operationId: cerrarTrabajo
+      summary: Cierra un trabajo y registra asistencia de todos los aceptados
+      description: >-
+        Solo ENCARGADO propietario activo, desde el fin previsto según el reloj
+        de PostgreSQL. Todos los aceptados aparecen exactamente una vez; cero
+        aceptados admite lista vacía. Asistentes reciben la duración completa,
+        ausentes cero. Pendientes pasan a RECHAZADA por CIERRE_TRABAJO.
+        La misma clave y contenido normalizado devuelve el resultado original;
+        la misma clave con otro contenido o un cierre nuevo devuelve 409.
+        El orden de attendance no afecta la idempotencia.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CierreInput' }
+      responses:
+        '200':
+          description: Trabajo cerrado o resultado idempotente previo
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Cierre' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /jobs/{id}/attendance:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    get:
+      tags: [Control]
+      operationId: consultarAsistenciaTrabajo
+      summary: Consulta asistencia de un trabajo propio cerrado
+      description: Solo ENCARGADO propietario. Devuelve datos básicos del estudiante.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Asistencia registrada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items: { $ref: '#/components/schemas/AsistenciaDetallada' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
+        '409': { $ref: '#/components/responses/ErrorConflicto' }
+
+  /me/progress:
+    get:
+      tags: [Control]
+      operationId: consultarProgresoPropio
+      summary: Consulta meta y minutos acreditados del becario
+      description: Solo BECARIO; suma asistencia persistida, incluyendo trabajos cerrados.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Progreso propio
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Progreso' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /me/history:
+    get:
+      tags: [Control]
+      operationId: consultarHistorialPropio
+      summary: Consulta historial propio de becario o encargado
+      description: >-
+        BECARIO recibe todas sus postulaciones, incluidas abiertas y ausencias;
+        attended es null si no se registró asistencia para esa postulación.
+        ENCARGADO recibe solo trabajos propios
+        cerrados y sus asistencias. Orden estable por fecha e ID.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Historial paginado según el rol
+          content:
+            application/json:
+              schema:
+                oneOf:
+                  - $ref: '#/components/schemas/HistorialBecario'
+                  - $ref: '#/components/schemas/HistorialEncargado'
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
 components:
   securitySchemes:
     cookieAuth:
@@ -898,6 +1014,20 @@ components:
       required: true
       description: Token CSRF de la sesión; se obtiene en la respuesta de login o en `GET /auth/me`.
       schema: { type: string, minLength: 20 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Clave estable por intento de cierre y única por encargado.
+      schema: { type: string, minLength: 8, maxLength: 128, pattern: '^[A-Za-z0-9._-]+$' }
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 1, default: 1 }
+    PageSize:
+      name: pageSize
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 50, default: 20 }
 
   responses:
     ErrorValidacion:
@@ -1161,6 +1291,97 @@ components:
           properties:
             trabajo:
               $ref: "#/components/schemas/Trabajo"
+
+    CierreInput:
+      type: object
+      additionalProperties: false
+      required: [attendance]
+      properties:
+        attendance:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [applicationId, attended]
+            properties:
+              applicationId: { type: string, format: uuid }
+              attended: { type: boolean }
+    Asistencia:
+      type: object
+      required: [applicationId, attended, awardedMinutes]
+      properties:
+        applicationId: { type: string, format: uuid }
+        attended: { type: boolean }
+        awardedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    AsistenciaDetallada:
+      allOf:
+        - $ref: '#/components/schemas/Asistencia'
+        - type: object
+          required: [student]
+          properties:
+            student:
+              type: object
+              additionalProperties: false
+              required: [name, code, career]
+              properties:
+                name: { type: string }
+                code: { type: string, pattern: '^[0-9]{5}$' }
+                career: { type: string }
+    Cierre:
+      type: object
+      additionalProperties: false
+      required: [job, attendance, closedAt]
+      properties:
+        job: { $ref: '#/components/schemas/Trabajo' }
+        attendance:
+          type: array
+          items: { $ref: '#/components/schemas/Asistencia' }
+        closedAt: { type: string, format: date-time }
+    Progreso:
+      type: object
+      additionalProperties: false
+      required: [targetMinutes, accreditedMinutes, remainingMinutes, excessMinutes]
+      properties:
+        targetMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    HistorialBecario:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [applicationId, applicationStatus, attended, awardedMinutes, job]
+            properties:
+              applicationId: { type: string, format: uuid }
+              applicationStatus: { type: string, enum: [PENDIENTE, ACEPTADA, RECHAZADA] }
+              attended: { type: [boolean, 'null'] }
+              awardedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              job: { $ref: '#/components/schemas/Trabajo' }
+        meta: { $ref: '#/components/schemas/Paginado' }
+    HistorialEncargado:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [job, closedAt, attendance]
+            properties:
+              job: { $ref: '#/components/schemas/Trabajo' }
+              closedAt: { type: string, format: date-time }
+              attendance:
+                type: array
+                items: { $ref: '#/components/schemas/AsistenciaDetallada' }
+        meta: { $ref: '#/components/schemas/Paginado' }
 
     Error:
       type: object

@@ -7,6 +7,7 @@ import { createLoginLimiter } from './lib/rateLimit.js'
 import { authRouter } from './routes/auth.js'
 import { usersRouter } from './routes/users.js'
 import { jobsRouter } from './routes/jobs.js'
+import { controlRouter } from './routes/control.js'
 
 // Construye la aplicación Express sobre un pool existente. Separar esto de
 // src/server.js permite montar la API en pruebas sin abrir un puerto fijo.
@@ -37,7 +38,7 @@ export function createApp({ pool, env = process.env }) {
         response.setHeader('Access-Control-Allow-Credentials', 'true')
         response.setHeader('Vary', 'Origin')
         response.setHeader('Access-Control-Allow-Methods', 'GET, POST, PATCH, OPTIONS')
-        response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token')
+        response.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-CSRF-Token, Idempotency-Key')
         response.setHeader('Access-Control-Max-Age', '600')
       }
       if (request.method === 'OPTIONS') {
@@ -65,6 +66,7 @@ export function createApp({ pool, env = process.env }) {
   app.use('/api/v1/auth', authRouter({ config, limiter }))
   app.use('/api/v1/users', usersRouter({ config }))
   app.use('/api/v1', jobsRouter({ config }))
+  app.use('/api/v1', controlRouter({ config }))
 
   app.use((request, response, next) => {
     next(notFound('Ruta no encontrada.'))

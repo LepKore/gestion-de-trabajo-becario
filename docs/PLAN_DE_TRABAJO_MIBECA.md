@@ -1,6 +1,6 @@
 # MiBeca — Plan de trabajo por fases
 
-**Versión 1.0 — 18 de octubre de 2026.** Guía de ejecución por fases para la primera entrega.
+**Versión 1.1 — 19 de octubre de 2026.** Guía de ejecución por fases para la primera entrega. La numeración coincide con `PLAN_MVP_MIBECA.md`.
 
 Este archivo se conserva por separado del plan general `PLAN_MVP_MIBECA.md`: organiza las tareas y sus criterios de aceptación sin reemplazar ese documento. Si surge una diferencia de alcance, resolverla y sincronizar ambos antes de implementar.
 
@@ -63,7 +63,7 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 
 1. Crear `openapi.yaml` canónico en backend antes de implementar rutas de negocio y validarlo en CI. Frontend referencia commit/tag y usa mocks compatibles mientras se implementa la API.
 2. Convenciones: `/api/v1`, JSON, UUID, UTC, duraciones en minutos, respuesta `data`, errores `code/message`, paginación con máximo 50 y respuestas 400/401/403/404/409 según caso. No devolver secretos ni trazas.
-3. Definir una única migración inicial del dominio y un único sistema de migraciones; no superponer Prisma e historial SQL propio.
+3. Mantener una migración inicial y ampliaciones aditivas en un único historial SQL; no superponer Prisma e historial SQL propio ni editar migraciones ya aplicadas.
 4. Crear las entidades mínimas:
 
 | Entidad | Campos y restricciones |
@@ -120,6 +120,8 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 
 **Aceptación:** flujo real de postulación/aceptación; dos aceptaciones concurrentes sobre el último cupo no generan sobrecupo.
 
+**Estado (19-10-2026): implementada en ambos repositorios.** OpenAPI 1.1.0 incorporó trabajos y postulaciones; la revisión 1.2.0 conserva sus rutas. La suite actual prueba cupos concurrentes, decisiones irreversibles, propiedad, actividad y condiciones de edición.
+
 ## Fase 4 — Control: cierre, asistencia y horas
 
 1. `POST /jobs/{id}/close` solo para propietario activo, desde el fin previsto según reloj del servidor.
@@ -134,6 +136,8 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 10. Encargado consulta historial y asistencia solo de sus trabajos; frontend exige marcar explícitamente asistencia o ausencia antes del cierre.
 
 **Aceptación:** cierre atómico e irrepetible; ambos historiales conservan asistencia y las horas coinciden con los asistentes.
+
+**Estado (19-10-2026): completada y verificada en local.** Backend: cierre transaccional, asistencia, auditoría, progreso e historiales bajo OpenAPI 1.2.0; migración `0003_cierre_asistencia.sql` aplicada en `mibeca_dev` local. Verificación: 42 pruebas backend, 14 frontend, lint/build y contrato válidos, recorrido real en Chromium de cierre y progreso/historial con asistencia y ausencia, incluido móvil. Evidencia y límites en `VERIFICACION_FASE_4.md` del backend. Las consultas administrativas y dashboards restantes corresponden a fase 5; CI remota y publicación a fase 6.
 
 ## Fase 5 — Dashboards y consulta administrativa básica
 
