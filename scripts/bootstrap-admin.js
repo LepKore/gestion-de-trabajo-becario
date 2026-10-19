@@ -4,7 +4,7 @@
 // ningún administrador activo. Nunca sobrescribe una cuenta existente. Si
 // BOOTSTRAP_ADMIN_PASSWORD está vacío se genera una contraseña temporal y se
 // muestra una sola vez por consola.
-//
+//jdncjdncndjcnjdnc
 // Uso: npm run db:bootstrap-admin
 //
 // Variables (solo lectura, en .env):
