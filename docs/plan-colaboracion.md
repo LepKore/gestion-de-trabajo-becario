@@ -41,13 +41,13 @@ Erick Magueño, Sergio Ramos e Ivan Zabala trabajan cada uno en su clon y en una
 
 Cada integrante mantiene su PostgreSQL local y su propio volumen; Git comparte Compose, configuración de ejemplo, migraciones y seeds explícitos de desarrollo, no datos ni secretos. Al integrar, los tres ejecutan nuevas migraciones sobre sus bases locales. Un seed no debe borrar datos ni correr automáticamente en producción.
 
-## CI/CD y Render futuro
+## CI/CD y despliegue (Supabase)
 
 Frontend: los workflows existentes compilan y publican, pero no ejecutan lint. Una mejora posterior añade un job de validación antes del job de publicación y protege `main` con PR/revisión y checks requeridos si el plan y permisos de GitHub lo permiten. El sitio Firebase actual puede ser plantilla o mock y no puede llamar a `localhost` de cada desarrollador desde el navegador de otros usuarios.
 
-Backend: crear CI de PR con instalación reproducible, lint/tests y un servicio PostgreSQL efímero sin credenciales de producción cuando existan pruebas de datos. No configurar deploy Render mientras no exista servicio MiBeca. Los cambios de migración se revisan como SQL y se prueban contra base efímera antes de aplicar a una base persistente.
+Backend: crear CI de PR con instalación reproducible, lint/tests y un servicio PostgreSQL efímero sin credenciales de producción cuando existan pruebas de datos. No configurar despliegue mientras no exista servicio MiBeca. Los cambios de migración se revisan como SQL y se prueban contra base efímera antes de aplicar a una base persistente. La CI no recibe credenciales de Supabase.
 
-Transición Render, **sin ejecutarla ahora**: crear una base PostgreSQL nueva destinada a MiBeca; crear el servicio backend; configurar `DATABASE_URL`, secreto de sesión, orígenes CORS y TLS según el proveedor sin desactivar globalmente la validación de certificados; aplicar migraciones explícitamente sobre esa base nueva; decidir por separado si cargar o transferir datos. Cambiar `DATABASE_URL` no copia datos ni crea tablas por sí mismo. Después, publicar la URL pública de API como variable de build del frontend, recompilar y publicar, probar flujo completo y preparar respaldo/rollback de código y migraciones. La base Render de otro proyecto sigue fuera de alcance incluso después del plazo mencionado.
+Despliegue en Supabase, **sin ejecutarlo ahora**: la conexión de producción usa el pooler **Supavisor en modo transacción (puerto 6543)**, no la conexión directa, con `DB_SSL_MODE=require` y `DB_POOL_MAX` bajo para no agotar el plan. Aplicar migraciones con `MIGRATION_TARGET=supabase` y `MIGRATION_CONFIRM_HOST` igual al host de `DATABASE_URL`; el ejecutor rechaza hosts que no terminen en `supabase.com` y rechaza TLS desactivado. Render queda como destino alternativo con `MIGRATION_TARGET=render`. No se usa el CLI de Supabase: el historial vive en `schema_migrations`. Cambiar `DATABASE_URL` no copia datos ni crea tablas por sí mismo. Después, publicar la URL pública de API como variable de build del frontend, recompilar y publicar, probar flujo completo y preparar respaldo/rollback de código y migraciones. La base Render de otro proyecto sigue fuera de alcance incluso después del plazo mencionado.
 
 ## Archivos de las siguientes fases
 
@@ -63,7 +63,7 @@ Transición Render, **sin ejecutarla ahora**: crear una base PostgreSQL nueva de
 | Editar `src/App.jsx`, borrar un componente obsoleto dentro del repositorio, ejecutar `npm run lint` | Permitido como trabajo ordinario; revisar diff y pruebas pertinentes. |
 | `docker compose stop` y `docker compose up --force-recreate -d` con el mismo volumen MiBeca | Permitido; comprobar salud y persistencia si Docker está disponible. |
 | `docker compose down -v` o `docker volume rm` | Hook local Codex rechaza destrucción de volúmenes; responsable identifica volumen, respaldo y destino antes de ejecutar manualmente una única operación autorizada. |
-| Migración SQL con `DATABASE_URL` apuntando a una base externa o a la base Render ajena | Fuera de alcance; no ejecutar. Para la futura base MiBeca, revisión de destino y migración en un proceso separado. |
+| Migración SQL con `DATABASE_URL` apuntando a una base externa o a la base Render ajena | Fuera de alcance; no ejecutar. Para Supabase o la futura base MiBeca, revisión de destino, `MIGRATION_CONFIRM_HOST` y migración en un proceso separado. |
 | `git push` a rama de tarea propia | Permitido por flujo de equipo si el usuario autorizó el push y GitHub lo acepta; `main` requiere PR, revisión y checks. |
 | Publicación live de Firebase o Render | Requiere autorización concreta y gates del proveedor/CI; no se deduce de que el código compile. |
 
