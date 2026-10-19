@@ -3,7 +3,7 @@ name: Backend CI
 on:
   pull_request:
   push:
-    branches: [main]
+    branches: [main, dev, sergio]
 
 permissions:
   contents: read
@@ -40,9 +40,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+          cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run check
       - run: npm run db:migrate:env
+      - name: Verificar migraciones idempotentes
+        run: npm run db:migrate:env
       - name: Validar contrato OpenAPI
         run: npx --yes @redocly/cli@1.34.2 lint openapi.yaml
       - name: Pruebas de API

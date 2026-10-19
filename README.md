@@ -1,6 +1,6 @@
 # MiBeca — backend
 
-API Node.js y PostgreSQL de MiBeca. Incluye Auth, Usuarios, Trabajos y Postulaciones bajo `/api/v1`, además de `GET /health` y `GET /ready`. La fase 4 añade cierre, asistencia, progreso e historiales; el alcance y estado se describen en [docs/PLAN_DE_TRABAJO_MIBECA.md](docs/PLAN_DE_TRABAJO_MIBECA.md).
+API Node.js y PostgreSQL de MiBeca. Incluye Auth, Usuarios, Trabajos, Postulaciones, Control y supervisión administrativa bajo `/api/v1`, además de `GET /health` y `GET /ready`. El alcance y estado se describen en [docs/PLAN_DE_TRABAJO_MIBECA.md](docs/PLAN_DE_TRABAJO_MIBECA.md).
 
 ## Requisitos
 
@@ -37,7 +37,7 @@ npm run dev
 
 `GET http://127.0.0.1:3000/health` confirma que el proceso responde. `GET http://127.0.0.1:3000/ready` ejecuta `SELECT 1` y devuelve 503 si PostgreSQL no está disponible. `CORS_ORIGIN` acepta orígenes separados por comas; en local se usa el origen de Vite.
 
-El contrato canónico es [`openapi.yaml`](openapi.yaml), revisión 1.2.0; `docs/api-v1.md` es un resumen subordinado. La API usa sesiones en cookies HttpOnly, CSRF en escrituras y comprobaciones de rol, actividad y propiedad.
+El contrato canónico es [`openapi.yaml`](openapi.yaml), revisión 1.3.0; `docs/api-v1.md` es un resumen subordinado. La API usa sesiones en cookies HttpOnly, CSRF en escrituras y comprobaciones de rol, actividad y propiedad.
 
 ## Primer administrador
 
@@ -60,7 +60,7 @@ Lee `BOOTSTRAP_ADMIN_NOMBRE`, `BOOTSTRAP_ADMIN_CORREO` y `BOOTSTRAP_ADMIN_PASSWO
 ```bash
 npm run check
 npm test
-npx @redocly/cli@latest lint openapi.yaml
+npx --yes @redocly/cli@1.34.2 lint openapi.yaml
 ```
 
 `npm run check` valida la sintaxis de los archivos `.js` de `src`, `scripts` y `test`. `npm test` ejecuta la suite de API contra `TEST_DATABASE_URL`: **recrea el esquema public de esa base en cada ejecución**. El helper exige un host local y una base llamada `mibeca*_test*`; no acepta destinos remotos. `npm run check`, `npm test` y el lint de `openapi.yaml` son los mismos pasos que ejecuta la CI.
@@ -91,7 +91,9 @@ Ejecuta `docker compose down` y `docker compose up -d postgres`, vuelve a entrar
 
 Cada integrante tiene su propio contenedor y volumen local; los registros no se sincronizan entre equipos. Git comparte `compose.yaml`, `.env.example`, código, migraciones SQL y, si se necesitan, semillas de desarrollo explícitas. No hay semillas automáticas. Una migración nueva debe tener nombre ordenable (por ejemplo `0001_usuarios.sql`) y no se edita tras aplicarse; el ejecutor comprueba su SHA-256. El equipo acuerda el contrato antes de crear tablas. Las decisiones compartidas se versionan en `docs/`.
 
-La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json` y ejecuta `npm run check`, las migraciones, el lint de `openapi.yaml` y la suite de API (creando una base `mibeca_test` efímera y exponiéndola como `TEST_DATABASE_URL`). No tiene acceso a Render ni a Supabase.
+La CI de este repositorio usa una base PostgreSQL efímera y credenciales de prueba, instala con `npm ci` desde `package-lock.json` y ejecuta `npm run check`, las migraciones dos veces para comprobar idempotencia, el lint de `openapi.yaml` y la suite de API (creando una base `mibeca_test` efímera y exponiéndola como `TEST_DATABASE_URL`). También comprueba `/ready`. Se ejecuta en PR y en las ramas `main`, `dev` y `sergio`. No tiene acceso a Render ni a Supabase.
+
+La preparación operativa de fase 6 y los límites verificados están en [docs/VERIFICACION_FASE_6.md](docs/VERIFICACION_FASE_6.md). El despliegue real requiere un proyecto Supabase exclusivo de MiBeca, secretos de entorno administrados y una URL pública configurada en el frontend; esta documentación no ejecuta migraciones remotas ni publica servicios.
 
 ## Comandos de build y de arranque en despliegue
 
@@ -105,7 +107,7 @@ El backend es JavaScript sin compilación, así que `build` no transpila nada: e
 
 En local, `npm start` y `npm run dev` leen el mismo `.env`, así que ambos funcionan sin configurar nada a mano. En el proveedor de despliegue no existe `.env`: mandan sus variables, que además prevalecen sobre el archivo si algún día apareciera uno.
 
-Variables que el proveedor debe inyectar: `DATABASE_URL`, `HOST=0.0.0.0`, `PORT`, `CORS_ORIGIN` con el dominio real del frontend y, por defecto, `NODE_ENV=production` (activa `COOKIE_SECURE=true`). Las migraciones se aplican aparte con `npm run db:migrate:env`; ver "Conectar con Supabase (despliegue)". El primer administrador se crea con `npm run db:bootstrap-admin`, una sola vez.
+Variables que el proveedor debe inyectar: `DATABASE_URL`, `HOST=0.0.0.0`, `PORT`, `CORS_ORIGIN` con el origen exacto del frontend y, por defecto, `NODE_ENV=production` (activa `COOKIE_SECURE=true`). Si frontend y API quedan cross-site, configura `SESSION_SAME_SITE=none`; aun así los navegadores pueden bloquear cookies de terceros, por lo que se recomienda usar dominios bajo el mismo sitio y probar la sesión en navegador antes de producción. Las migraciones se aplican aparte con `npm run db:migrate:env`; ver "Conectar con Supabase (despliegue)". El primer administrador se crea con `npm run db:bootstrap-admin`, una sola vez.
 
 ## Conectar con Supabase (despliegue)
 

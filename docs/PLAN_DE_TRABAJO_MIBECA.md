@@ -178,6 +178,8 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 
 **Aceptación:** controles pasan, resultados reales documentados y, si se publica en esta etapa, flujo completo verificado en navegador.
 
+**Estado (19-10-2026): controles locales implementados y verificados; operación productiva pendiente.** La suite API completa pasó contra PostgreSQL descartable local; CI backend y frontend quedan configuradas con instalación reproducible y controles antes de despliegue Firebase. Sesión expirada y foco modal se cubren en frontend. No se ejecutaron CI remota, recorrido de navegador real, aprovisionamiento Supabase, migraciones remotas ni despliegues: faltan servicios/dominios/secretos de producción y esta tarea no autoriza publicarlos. Evidencia en `docs/VERIFICACION_FASE_6.md`.
+
 ## Orden de entrega y trabajo en equipo
 
 1. Contexto, coordinación, hooks y Docker verificables.
