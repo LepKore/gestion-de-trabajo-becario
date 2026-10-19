@@ -14,6 +14,22 @@ let becarioPassword
 let encargado
 let encargadoPassword
 
+describe('endpoints de salud', () => {
+  it('GET /health confirma que la API está activa', async () => {
+    await new Promise((resolve) => setImmediate(resolve))
+    const response = await ctx.get('/health')
+    assert.equal(response.status, 200)
+    assert.deepEqual(response.body, { status: 'ok' })
+  })
+
+  it('GET /health_db confirma la conexión con PostgreSQL', async () => {
+    await new Promise((resolve) => setImmediate(resolve))
+    const response = await ctx.get('/health_db')
+    assert.equal(response.status, 200)
+    assert.deepEqual(response.body, { status: 'ok' })
+  })
+})
+
 before(async () => {
   const env = testEnv()
   const url = databaseUrl()
