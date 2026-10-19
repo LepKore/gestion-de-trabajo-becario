@@ -48,15 +48,15 @@ jobs:
         run: npm run db:migrate:env
       - name: Validar contrato OpenAPI
         run: npx --yes @redocly/cli@1.34.2 lint openapi.yaml
-      - name: Pruebas de API
+      - name: Pruebas de API con helpers y base efímera
         env:
           TEST_DATABASE_URL: postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_test
         run: |
           node scripts/create-test-database.js
-          npm test
+          node --test --test-concurrency=1 "test/*.test.js"
       - name: Comprobar disponibilidad de API y PostgreSQL
         run: |
-          npm start &
+          node src/server.js &
           api_pid=$!
           trap 'kill "$api_pid"' EXIT
           for attempt in 1 2 3 4 5 6 7 8 9 10; do
