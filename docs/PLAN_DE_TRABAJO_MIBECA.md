@@ -100,6 +100,8 @@ Incluye Auth, Usuarios, Trabajos y Control, más una consulta administrativa bá
 
 **Aceptación:** administrador crea estudiante y encargado, ambos acceden y cambian contraseña; permisos y revocación funcionan en API y UI.
 
+**Estado (19-10-2026): completada.** Los siete puntos están implementados en backend y frontend, con 25 pruebas de API, lint y build en verde y recorrido verificado en navegador. Evidencia en `docs/VERIFICACION_FASE_2.md`. Pendiente de fases posteriores: nada de esta fase queda abierto salvo el despliegue, que no se ha ejecutado.
+
 ## Fase 3 — Trabajos y postulaciones
 
 1. Implementar:

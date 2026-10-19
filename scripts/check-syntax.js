@@ -1,0 +1,39 @@
+import { readdir } from 'node:fs/promises'
+import { spawn } from 'node:child_process'
+import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+// `npm run check`: valida la sintaxis de todo el JavaScript del proyecto para
+// que un error no llegue al arranque ni a las pruebas.
+const roots = ['src', 'scripts', 'test']
+const base = fileURLToPath(new URL('../', import.meta.url))
+
+async function collect(dir, found = []) {
+  let entries
+  try {
+    entries = await readdir(dir, { withFileTypes: true })
+  } catch (error) {
+    if (error.code === 'ENOENT') return found
+    throw error
+  }
+  for (const entry of entries) {
+    const full = join(dir, entry.name)
+    if (entry.isDirectory()) await collect(full, found)
+    else if (entry.isFile() && entry.name.endsWith('.js')) found.push(full)
+  }
+  return found
+}
+
+const files = []
+for (const root of roots) files.push(...(await collect(join(base, root))))
+if (files.length === 0) {
+  console.error('No se encontró JavaScript para comprobar')
+  process.exit(1)
+}
+
+const code = await new Promise((resolve) => {
+  spawn(process.execPath, ['--check', ...files], { stdio: 'inherit' }).on('exit', resolve)
+})
+
+if (code === 0) console.log(`Sintaxis correcta en ${files.length} archivos.`)
+process.exit(code)
