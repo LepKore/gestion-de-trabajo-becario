@@ -98,6 +98,32 @@ export async function getProgress(pool, studentId) {
     excessMinutes: Math.max(accreditedMinutes - targetMinutes, 0) }
 }
 
+export async function getOwnerDashboard(pool, ownerId) {
+  const { rows } = await pool.query(`SELECT
+      count(*)::int AS total_jobs,
+      count(*) FILTER (WHERE t.estado='PUBLICADO')::int AS published_jobs,
+      count(*) FILTER (WHERE t.estado='CERRADO')::int AS closed_jobs,
+      count(*) FILTER (WHERE t.estado='PUBLICADO' AND t.fin_previsto <= clock_timestamp())::int AS pending_close_jobs,
+      COALESCE(sum(stats.pending_applications),0)::int AS pending_applications,
+      COALESCE(sum(stats.accepted_students),0)::int AS accepted_students
+    FROM trabajos t
+    LEFT JOIN LATERAL (
+      SELECT count(*) FILTER (WHERE p.estado='PENDIENTE')::int AS pending_applications,
+        count(*) FILTER (WHERE p.estado='ACEPTADA')::int AS accepted_students
+      FROM postulaciones p WHERE p.trabajo_id=t.id
+    ) stats ON true
+    WHERE t.encargado_id=$1`, [ownerId])
+  const row = rows[0]
+  return {
+    totalJobs: row.total_jobs,
+    publishedJobs: row.published_jobs,
+    closedJobs: row.closed_jobs,
+    pendingCloseJobs: row.pending_close_jobs,
+    pendingApplications: row.pending_applications,
+    acceptedStudents: row.accepted_students,
+  }
+}
+
 export async function getStudentHistory(pool, studentId, filters) {
   const count = await pool.query('SELECT count(*)::int AS total FROM postulaciones WHERE estudiante_id=$1', [studentId])
   const { rows } = await pool.query(`SELECT p.id,p.estado,p.trabajo_id,a.asistio,a.minutos_acreditados
@@ -110,6 +136,12 @@ export async function getStudentHistory(pool, studentId, filters) {
     job: await getJob(pool, row.trabajo_id),
   })))
   return pageResult(data, count.rows[0].total, filters)
+}
+
+export async function getStudentHistoryForAdmin(pool, studentId, filters) {
+  const student = await pool.query('SELECT 1 FROM estudiantes WHERE usuario_id=$1', [studentId])
+  if (!student.rows[0]) throw notFound('Estudiante no encontrado.')
+  return getStudentHistory(pool, studentId, filters)
 }
 
 async function getAttendanceForJobs(pool, ids) {

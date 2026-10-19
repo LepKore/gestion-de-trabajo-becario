@@ -181,3 +181,61 @@ it('aplica rol, propiedad, CSRF y validacion de clave a las nuevas rutas', async
   assert.equal(preflight.status, 204)
   assert.match(preflight.headers.get('access-control-allow-headers'), /Idempotency-Key/)
 })
+
+it('ADMIN filtra el progreso de estudiantes y consulta su historial; otros roles quedan excluidos', async () => {
+  const pendingSuffix = `pending-progress-${++counter}`
+  const completeSuffix = `complete-progress-${++counter}`
+  const pendingStudent = await actor({ ...datos.becario, estudiante: { ...datos.becario.estudiante, metaMinutos: 120 } }, pendingSuffix, '31001')
+  const completeStudent = await actor({ ...datos.becario, estudiante: { ...datos.becario.estudiante, metaMinutos: 60 } }, completeSuffix, '31002')
+  const completedJob = await createJob(60, 1)
+  const applicationId = await apply(completeStudent, completedJob, true)
+  await finish(completedJob)
+  assert.equal((await close(completedJob, [{ applicationId, attended: true }])).status, 200)
+
+  const pending = await admin.get('/api/v1/students/progress?conHorasPendientes=true&q=31001&pageSize=50')
+  assert.equal(pending.status, 200, JSON.stringify(pending.body))
+  assert.equal(pending.body.meta.total, 1)
+  assert.deepEqual(pending.body.data[0], {
+    id: pendingStudent.id, name: datos.becario.nombre, email: `${pendingSuffix}@uni.edu`,
+    code: '31001', career: datos.becario.estudiante.carrera, semester: datos.becario.estudiante.semestre,
+    targetMinutes: 120, accreditedMinutes: 0, remainingMinutes: 120, excessMinutes: 0,
+  })
+
+  const reached = await admin.get(`/api/v1/students/progress?conHorasPendientes=false&q=31002`)
+  assert.equal(reached.status, 200)
+  assert.equal(reached.body.data[0].accreditedMinutes, 60)
+  assert.equal(reached.body.data[0].remainingMinutes, 0)
+  assert.equal(reached.body.data[0].excessMinutes, 0)
+
+  const history = await admin.get(`/api/v1/students/${completeStudent.id}/history`)
+  assert.equal(history.status, 200)
+  assert.equal(history.body.meta.total, 1)
+  assert.equal(history.body.data[0].applicationId, applicationId)
+  assert.equal(history.body.data[0].attended, true)
+  assert.equal(history.body.data[0].awardedMinutes, 60)
+  assert.equal((await admin.get('/api/v1/students/00000000-0000-4000-8000-000000000000/history')).status, 404)
+
+  for (const client of [owner, pendingStudent, completeStudent]) {
+    assert.equal((await client.get('/api/v1/students/progress')).status, 403)
+    assert.equal((await client.get(`/api/v1/students/${completeStudent.id}/history`)).status, 403)
+  }
+  assert.equal((await admin.get('/api/v1/students/progress?conHorasPendientes=maybe')).status, 400)
+})
+
+it('el resumen del encargado agrega únicamente sus trabajos y estados', async () => {
+  const response = await owner.get('/api/v1/me/dashboard')
+  assert.equal(response.status, 200, JSON.stringify(response.body))
+  const { rows } = await ctx.pool.query(`SELECT count(*)::int AS total,
+    count(*) FILTER (WHERE estado='PUBLICADO')::int AS published,
+    count(*) FILTER (WHERE estado='CERRADO')::int AS closed
+    FROM trabajos WHERE encargado_id=$1`, [owner.id])
+  assert.equal(response.body.data.totalJobs, rows[0].total)
+  assert.equal(response.body.data.publishedJobs, rows[0].published)
+  assert.equal(response.body.data.closedJobs, rows[0].closed)
+  assert.equal(response.body.data.pendingApplications >= 0, true)
+  assert.equal(response.body.data.acceptedStudents >= 0, true)
+  assert.equal(response.body.data.pendingCloseJobs >= 0, true)
+  assert.equal((await other.get('/api/v1/me/dashboard')).body.data.totalJobs, 0)
+  assert.equal((await admin.get('/api/v1/me/dashboard')).status, 403)
+  assert.equal((await first.get('/api/v1/me/dashboard')).status, 403)
+})

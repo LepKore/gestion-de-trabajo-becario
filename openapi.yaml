@@ -1,10 +1,10 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.2.0
+  version: 1.3.0
   description: >-
     Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
-    Postulaciones y Control (fases 2 a 4 del plan de trabajo).
+    Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
     Convenciones: prefijo /api/v1, JSON UTF-8, UUID, fechas UTC, duraciones en
     minutos enteros. Éxitos envueltos en `data`; errores con `code` y `message`.
   license:
@@ -968,6 +968,26 @@ paths:
         '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
         '403': { $ref: '#/components/responses/ErrorProhibido' }
 
+  /me/dashboard:
+    get:
+      tags: [Control]
+      operationId: consultarResumenEncargado
+      summary: Consulta métricas resumidas de trabajos propios
+      description: Solo ENCARGADO. Agrega sus trabajos publicados, postulaciones pendientes, aceptaciones y trabajos disponibles para cierre.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Métricas agregadas de la cuenta autenticada
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/ResumenEncargado' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
   /me/history:
     get:
       tags: [Control]
@@ -994,6 +1014,55 @@ paths:
         '400': { $ref: '#/components/responses/ErrorValidacion' }
         '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
         '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/progress:
+    get:
+      tags: [Control]
+      operationId: consultarProgresoEstudiantes
+      summary: Consulta el progreso de estudiantes para supervisión administrativa
+      description: Solo ADMIN. Filtra por texto y por si quedan minutos pendientes; incluye cuentas inactivas para conservar la consulta histórica.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - name: q
+          in: query
+          schema: { type: string, minLength: 1, maxLength: 100 }
+        - name: conHorasPendientes
+          in: query
+          description: Si es true devuelve estudiantes con horas pendientes; si es false devuelve quienes alcanzaron o superaron su meta.
+          schema: { type: boolean }
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Progreso paginado por estudiante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ProgresoEstudiantes' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/{id}/history:
+    get:
+      tags: [Control]
+      operationId: consultarHistorialEstudiante
+      summary: Consulta el historial de un estudiante
+      description: Solo ADMIN. Incluye postulaciones, asistencias, ausencias y acreditación persistida.
+      security: [{ cookieAuth: [] }]
+      parameters:
+        - $ref: '#/components/parameters/UsuarioId'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          description: Historial paginado del estudiante
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HistorialBecario' }
+        '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+        '404': { $ref: '#/components/responses/ErrorNoEncontrado' }
 
 components:
   securitySchemes:
@@ -1346,6 +1415,40 @@ components:
         accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    ProgresoEstudiantes:
+      type: object
+      additionalProperties: false
+      required: [data, meta]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, email, code, career, semester, targetMinutes, accreditedMinutes, remainingMinutes, excessMinutes]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              email: { type: string, format: email }
+              code: { type: string, pattern: '^[0-9]{5}$' }
+              career: { type: string }
+              semester: { type: integer, minimum: 1 }
+              targetMinutes: { type: integer, minimum: 6, multipleOf: 6 }
+              accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+        meta: { $ref: '#/components/schemas/Paginado' }
+    ResumenEncargado:
+      type: object
+      additionalProperties: false
+      required: [totalJobs, publishedJobs, closedJobs, pendingCloseJobs, pendingApplications, acceptedStudents]
+      properties:
+        totalJobs: { type: integer, minimum: 0 }
+        publishedJobs: { type: integer, minimum: 0 }
+        closedJobs: { type: integer, minimum: 0 }
+        pendingCloseJobs: { type: integer, minimum: 0 }
+        pendingApplications: { type: integer, minimum: 0 }
+        acceptedStudents: { type: integer, minimum: 0 }
     HistorialBecario:
       type: object
       additionalProperties: false
