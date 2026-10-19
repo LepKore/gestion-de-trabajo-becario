@@ -42,8 +42,7 @@ jobs:
         env:
           TEST_DATABASE_URL: postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_test
         run: |
-          psql "postgresql://mibeca_ci:mibeca_ci_only@127.0.0.1:5432/mibeca_ci" \
-            -c "CREATE DATABASE mibeca_test OWNER mibeca_ci;"
+          node scripts/create-test-database.js
           npm test
       - name: Comprobar disponibilidad de API y PostgreSQL
         run: |
