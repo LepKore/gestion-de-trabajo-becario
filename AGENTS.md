@@ -8,3 +8,4 @@
 - Antes de aplicar migraciones, revisa el destino de `DATABASE_URL` y el SQL. Los datos de prueba se cargan solo con comando explícito de desarrollo.
 - `docker compose down` conserva el volumen. `docker compose down -v`, `docker volume rm` y equivalentes pueden borrar datos y el hook local los rechaza. Si se necesita borrar, el responsable revisa y ejecuta manualmente fuera de Codex.
 - El hook de Git se instala localmente con `git config core.hooksPath .githooks`. Antes de un PR, ejecuta las pruebas y validaciones pertinentes. Los hooks locales no sustituyen revisiones ni controles en GitHub.
+- El auditor de código (`.opencode/lib/code-audit-rules.js`) bloquea escrituras que incumplen las 5 reglas duras (secretos, credenciales, URI con contraseña en `src/`, SQL con datos de petición, ruta de escritura sin CSRF) en OpenCode y en Codex. No es una excepción negociable: corrige el código, no el control. Detalle en `docs/automation.md` (comprobado el 21-10-2026).
