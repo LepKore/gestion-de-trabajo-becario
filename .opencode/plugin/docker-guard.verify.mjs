@@ -2,7 +2,7 @@
  * Verificacion de paridad del plugin docker-guard frente a la tabla canonica.
  * Uso: node .opencode/plugin/docker-guard.verify.mjs
  */
-import { backendRoot, blocked, pathOf } from "./docker-guard.js";
+import { backendRoot, blocked, blockedMigration, pathOf } from "../lib/docker-guard-rules.js";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
@@ -44,6 +44,16 @@ const CASES = [
   ["git commit -m \"docker volume prune\"", null],
 ];
 
+const MIGRATION_CASES = [
+  ["npm run db:migrate", "deny"],
+  ["npm run db:migrate:env", "deny"],
+  ["MIGRATION_TARGET=supabase npm run db:migrate", "deny"],
+  ["MIGRATION_TARGET=local npm run db:migrate", null],
+  ["DATABASE_URL=postgresql://u:p@localhost:5432/db npm run db:migrate:env", null],
+  ["npm run db:create-admin", "deny"],
+  ["npm run test", null],
+];
+
 let failures = 0;
 for (const [command, expected] of CASES) {
   const condition = blocked(command, cwd, backend, composeFiles);
@@ -53,5 +63,14 @@ for (const [command, expected] of CASES) {
   console.log(`${ok ? "OK  " : "FALLA"} | ${expected ?? "permitido"} | ${command}${condition ? ` -> ${condition}` : ""}`);
 }
 
-console.log(`\n${CASES.length - failures}/${CASES.length} casos correctos`);
+for (const [command, expected] of MIGRATION_CASES) {
+  const condition = blockedMigration(command);
+  const actual = condition ? "deny" : null;
+  const ok = actual === expected;
+  if (!ok) failures += 1;
+  console.log(`${ok ? "OK  " : "FALLA"} | ${expected ?? "permitido"} | ${command}${condition ? ` -> ${condition}` : ""}`);
+}
+
+const total = CASES.length + MIGRATION_CASES.length;
+console.log(`\n${total - failures}/${total} casos correctos`);
 process.exit(failures === 0 ? 0 : 1);

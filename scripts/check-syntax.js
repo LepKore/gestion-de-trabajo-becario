@@ -4,8 +4,9 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 // `npm run check`: valida la sintaxis de todo el JavaScript del proyecto para
-// que un error no llegue al arranque ni a las pruebas.
-const roots = ['src', 'scripts', 'test']
+// que un error no llegue al arranque ni a las pruebas. Incluye el tooling local
+// (`.opencode`, `.codex`) para que un plugin o puente roto se detecte aqui.
+const roots = ['src', 'scripts', 'test', '.opencode', '.codex']
 const base = fileURLToPath(new URL('../', import.meta.url))
 
 async function collect(dir, found = []) {
@@ -19,7 +20,7 @@ async function collect(dir, found = []) {
   for (const entry of entries) {
     const full = join(dir, entry.name)
     if (entry.isDirectory()) await collect(full, found)
-    else if (entry.isFile() && entry.name.endsWith('.js')) found.push(full)
+    else if (entry.isFile() && /\.(?:js|mjs)$/.test(entry.name)) found.push(full)
   }
   return found
 }
