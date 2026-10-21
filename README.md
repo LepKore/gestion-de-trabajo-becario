@@ -2,6 +2,27 @@
 
 API Node.js y PostgreSQL de MiBeca. Incluye Auth, Usuarios, Trabajos y Postulaciones bajo `/api/v1`, además de `GET /health` y `GET /ready`. La fase 4 añade cierre, asistencia, progreso e historiales; el alcance y estado se describen en [docs/PLAN_DE_TRABAJO_MIBECA.md](docs/PLAN_DE_TRABAJO_MIBECA.md).
 
+## Probar la aplicación publicada
+
+La demostración está disponible en **https://mibeca.web.app**. La interfaz se conecta con la API publicada en `https://gestion-de-trabajo-becario-backend.onrender.com/api/v1`; no es necesario instalar el proyecto ni iniciar PostgreSQL para recorrerla.
+
+Estas cuentas pertenecen al despliegue de evaluación y no se crean al ejecutar el proyecto localmente:
+
+| Cuenta | Correo | Contraseña |
+| --- | --- | --- |
+| Administrador | `admin@upb.edu` | `admin12345` |
+| Iván | `ivan@upb.edu` | `ivan123456` |
+| Juan | `juan@upb.edu` | `juan123456` |
+
+Para probar el flujo:
+
+1. Abre la aplicación e inicia sesión con una de las cuentas de la tabla. El menú lateral muestra las opciones correspondientes a su rol.
+2. Con **Administrador**, revisa **Usuarios**, **Trabajos** y **Supervisión**. Desde Usuarios se pueden crear otras cuentas; las contraseñas temporales nuevas se muestran una sola vez.
+3. Con la cuenta que muestre **Mis trabajos**, entra como encargado: publica un trabajo y revisa las postulaciones. Con la cuenta que muestre **Trabajos disponibles**, entra como estudiante becario y postúlate.
+4. Vuelve a la cuenta de encargado para aceptar la postulación. Después de la actividad, usa **Cierre y horas** para registrar asistencia y cerrar el trabajo. El estudiante podrá revisar **Mis postulaciones**, **Historial** y su progreso en **Resumen**.
+
+Las acciones realizadas modifican los datos compartidos de esta demostración. Estas credenciales son solo para evaluación; deben cambiarse antes de usar el despliegue con datos reales.
+
 ## Requisitos
 
 - Node.js 22 o superior y npm.
