@@ -1,5 +1,5 @@
 {
-  "description": "MiBeca: guardia local de volúmenes Docker",
+  "description": "MiBeca: guardia local de volúmenes Docker y auditoría de código",
   "hooks": {
     "PreToolUse": [
       {
@@ -10,6 +10,30 @@
             "command": "python \"$(git rev-parse --show-toplevel)/.codex/hooks/pre_tool_use.py\"",
             "timeout": 5,
             "statusMessage": "Comprobando operación Docker"
+          }
+        ]
+      },
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/audit_bridge.mjs",
+            "timeout": 10,
+            "statusMessage": "Auditando la escritura"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "^apply_patch$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node .codex/hooks/audit_bridge.mjs",
+            "timeout": 10,
+            "statusMessage": "Auditando el archivo escrito"
           }
         ]
       }

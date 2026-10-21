@@ -15,7 +15,10 @@
     "db:create-admin": "node --env-file=.env scripts/create-admin.js",
     "db:bootstrap-admin": "node --env-file=.env scripts/bootstrap-admin.js",
     "test": "node --env-file-if-exists=.env --test --test-concurrency=1 \"test/*.test.js\"",
-    "check": "node scripts/check-syntax.js"
+    "check": "node scripts/check-syntax.js",
+    "audit:changed": "node .codex/hooks/audit_bridge.mjs --changed",
+    "audit:all": "node .codex/hooks/audit_bridge.mjs --all --info",
+    "audit:verify": "node .opencode/plugin/code-audit.verify.mjs && node .opencode/plugin/docker-guard.verify.mjs"
   },
   "dependencies": {
     "argon2": "^0.45.1",
