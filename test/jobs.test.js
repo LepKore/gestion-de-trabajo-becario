@@ -75,7 +75,7 @@ it('propiedad, privacidad y decisiones irreversibles', async () => {
     assert.equal((await client.post(`/api/v1/applications/${application.id}/reject`, {})).status, 403)
   }
   const list = await owner.get(`/api/v1/jobs/${created.id}/applications`)
-  assert.deepEqual(Object.keys(list.body.data[0].estudiante).sort(), ['carrera', 'codigo', 'nombre'])
+  assert.deepEqual(Object.keys(list.body.data[0].estudiante).sort(), ['accreditedMinutes', 'carrera', 'codigo', 'nombre', 'remainingMinutes', 'semester', 'targetMinutes'])
   assert.equal((await owner.post(`/api/v1/applications/${application.id}/reject`, {})).status, 200)
   assert.equal((await owner.post(`/api/v1/applications/${application.id}/accept`, {})).status, 409)
   assert.equal((await other.patch(`/api/v1/jobs/${created.id}`, { titulo: 'Ajeno' })).status, 403)
@@ -153,4 +153,18 @@ it('relee actividad tras el bloqueo y conserva el contexto original', async () =
     await pending
     await ctx.pool.query('UPDATE usuarios SET activo=true WHERE id=$1', [student.id])
   }
+})
+it('expone semestre y progreso de beca al encargado, no al becario', async () => {
+  const created = await job(), application = await apply(student, created.id)
+  assert.equal((await owner.post(`/api/v1/applications/${application.id}/accept`, {})).status, 200)
+  await ctx.pool.query("UPDATE trabajos SET inicio_previsto=clock_timestamp()-interval '2 hours',fin_previsto=clock_timestamp()-interval '1 hour' WHERE id=$1", [created.id])
+  const closed = await owner.post(`/api/v1/jobs/${created.id}/close`, { attendance: [{ applicationId: application.id, attended: true }] }, { 'Idempotency-Key': `postulantes-${created.id}` })
+  assert.equal(closed.status, 200, JSON.stringify(closed.body))
+  const { estudiante } = (await owner.get(`/api/v1/jobs/${created.id}/applications`)).body.data[0]
+  assert.deepEqual(estudiante, {
+    nombre: datos.becario.nombre, codigo: '10001', carrera: datos.becario.estudiante.carrera,
+    semester: 4, targetMinutes: 120, accreditedMinutes: 60, remainingMinutes: 60,
+  })
+  const propias = await student.get('/api/v1/me/applications')
+  assert.ok(propias.body.data.every(a => a.estudiante === undefined && a.trabajo))
 })

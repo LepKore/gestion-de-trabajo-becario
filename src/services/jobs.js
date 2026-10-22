@@ -135,7 +135,9 @@ export async function listApplications(pool, filters, { jobId = null, actorId })
   const where = 'WHERE ($1::uuid IS NULL OR p.trabajo_id=$1) AND ($2::uuid IS NULL OR p.estudiante_id=$2) AND ($3::text IS NULL OR p.estado=$3)'
   const values = [jobId, jobId ? null : actorId, filters.estado ?? null]
   const count = await pool.query(`SELECT count(*)::int AS total FROM postulaciones p ${where}`, values)
-  const { rows } = await pool.query(`SELECT p.*,u.nombre,e.codigo,e.carrera FROM postulaciones p JOIN estudiantes e ON e.usuario_id=p.estudiante_id JOIN usuarios u ON u.id=p.estudiante_id ${where} ORDER BY p.creado_en,p.id LIMIT $4 OFFSET $5`, [...values,filters.pageSize,(filters.page-1)*filters.pageSize])
+  const { rows } = await pool.query(`SELECT p.*,u.nombre,e.codigo,e.carrera,e.semestre,e.meta_minutos,
+    (SELECT COALESCE(sum(a.minutos_acreditados),0)::bigint FROM postulaciones previa LEFT JOIN asistencias a ON a.postulacion_id=previa.id WHERE previa.estudiante_id=p.estudiante_id) AS acreditados
+    FROM postulaciones p JOIN estudiantes e ON e.usuario_id=p.estudiante_id JOIN usuarios u ON u.id=p.estudiante_id ${where} ORDER BY p.creado_en,p.id LIMIT $4 OFFSET $5`, [...values,filters.pageSize,(filters.page-1)*filters.pageSize])
   // Fetch the page's jobs in one query rather than one query per application.
   const jobs = new Map()
   if (!jobId && rows.length) {
@@ -145,7 +147,7 @@ export async function listApplications(pool, filters, { jobId = null, actorId })
   const data = rows.map(row => ({
     ...applicationView(row),
     ...(jobId
-      ? { estudiante: { nombre: row.nombre, codigo: row.codigo, carrera: row.carrera } }
+      ? { estudiante: { nombre: row.nombre, codigo: row.codigo, carrera: row.carrera, semester: row.semestre, targetMinutes: row.meta_minutos, accreditedMinutes: Number(row.acreditados), remainingMinutes: Math.max(row.meta_minutos - Number(row.acreditados), 0) } }
       : { trabajo: jobs.get(row.trabajo_id) }),
   }))
   return pageResult(data, count.rows[0].total, filters)

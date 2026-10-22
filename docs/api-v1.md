@@ -1,6 +1,6 @@
 # MiBeca API v1 — resumen subordinado al contrato
 
-**Estado (19-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control y Supervisión están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.3.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
+**Estado (19-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control y Supervisión están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.4.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
 
 ## Convenciones acordadas
 
@@ -22,7 +22,7 @@ Todas reciben el prefijo `/api/v1`. La columna «Estado» distingue lo implement
 | Usuarios | `POST /users/{id}/deactivate`, `POST /users/{id}/reactivate`, `POST /users/{id}/reset-password` | Solo administrador; desactivación y reset revocan sesiones. | Implementado |
 | Trabajos | `GET /jobs`, `POST /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}` | Lectura según rol; creación y edición solo por encargado propietario antes del inicio y de cualquier aceptación. | Implementado |
 | Control | `POST /jobs/{id}/close`, `GET /jobs/{id}/attendance` | Propietario; cierre único desde fin previsto y consulta posterior de asistencia. | Implementado |
-| Postulaciones | `POST /jobs/{id}/applications`, `GET /jobs/{id}/applications` | Postulación propia de becario; listado del encargado propietario. | Implementado |
+| Postulaciones | `POST /jobs/{id}/applications`, `GET /jobs/{id}/applications` | Postulación propia de becario; listado del encargado propietario con semestre y progreso de beca del estudiante. | Implementado |
 | Postulaciones | `POST /applications/{id}/accept`, `POST /applications/{id}/reject` | Encargado propietario antes del inicio; aceptación con control transaccional de cupo. | Implementado |
 | Consultas propias | `GET /me/applications`, `GET /me/jobs` | Según rol y propiedad. | Implementado |
 | Control propio | `GET /me/progress`, `GET /me/history` | Según rol y propiedad; progreso solo de becario. | Implementado |

@@ -1,0 +1,17 @@
+{
+  // Solo para el language server (opencode/LSP y editor): no interviene en el
+  // arranque ni en `npm run check`. Sin este archivo el server no tiene
+  // proyecto al que atar los .js y no da navegacion ni autocompletado.
+  // checkJs queda en false a proposito: el proyecto es JS con validacion zod,
+  // no tipos estaticos.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "exclude": ["node_modules"]
+}

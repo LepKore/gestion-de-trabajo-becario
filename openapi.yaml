@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.3.0
+  version: 1.4.0
   description: >-
     Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
     Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
@@ -605,7 +605,7 @@ paths:
         - "Postulaciones"
       operationId: "listarPostulantes"
       summary: "Lista postulantes del trabajo propio"
-      description: "Solo ENCARGADO propietario. Datos del estudiante limitados a nombre, código y carrera. Otros roles o propietario ajeno reciben 403."
+      description: "Solo ENCARGADO propietario. Devuelve nombre, código, carrera, semestre y progreso de beca del estudiante (minutos de meta, acreditados y restantes). Otros roles o propietario ajeno reciben 403."
       security:
         -
           cookieAuth: []
@@ -1391,6 +1391,22 @@ components:
                   pattern: "^[0-9]{5}$"
                 carrera:
                   type: "string"
+                semester:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 12
+                targetMinutes:
+                  type: "integer"
+                  minimum: 6
+                  multipleOf: 6
+                accreditedMinutes:
+                  type: "integer"
+                  minimum: 0
+                  multipleOf: 6
+                remainingMinutes:
+                  type: "integer"
+                  minimum: 0
+                  multipleOf: 6
     PostulacionConTrabajo:
       allOf:
         -
