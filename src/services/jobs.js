@@ -43,7 +43,7 @@ async function activeUsers(client, ids, actorId) {
   }
 }
 async function lockJob(client, id) {
-  const { rows } = await client.query('SELECT * FROM trabajos WHERE id=$1 FOR UPDATE', [id])
+  const { rows } = await client.query('SELECT id,encargado_id,titulo,estado,inicio_previsto,duracion_minutos,cupos FROM trabajos WHERE id=$1 FOR UPDATE', [id])
   if (!rows[0]) throw notFound('Trabajo no encontrado.')
   return rows[0]
 }
@@ -116,13 +116,13 @@ export async function decideApplication(pool, id, actorId, state) {
     if (!lookup.rows[0]) throw notFound('Postulación no encontrada.')
     const job = await lockJob(client, lookup.rows[0].trabajo_id)
     ownerOnly(job, actorId)
-    const { rows } = await client.query('SELECT * FROM postulaciones WHERE id=$1 FOR UPDATE', [id])
+    const { rows } = await client.query('SELECT id,trabajo_id,estudiante_id,estado,creado_en,actualizado_en FROM postulaciones WHERE id=$1 FOR UPDATE', [id])
     const application = rows[0]
     await activeUsers(client, state === 'ACEPTADA' ? [actorId, application.estudiante_id] : [actorId], actorId)
     await notStarted(client, job)
     if (application.estado !== 'PENDIENTE') throw conflict('postulacion_resuelta', 'La decisión de esta postulación ya fue registrada.')
     if (state === 'ACEPTADA') await available(client, job)
-    const updated = await client.query('UPDATE postulaciones SET estado=$2,actualizado_en=clock_timestamp() WHERE id=$1 RETURNING *', [id,state])
+    const updated = await client.query('UPDATE postulaciones SET estado=$2,actualizado_en=clock_timestamp() WHERE id=$1 RETURNING id,trabajo_id,estudiante_id,estado,creado_en,actualizado_en', [id,state])
     return applicationView(updated.rows[0])
   })
 }

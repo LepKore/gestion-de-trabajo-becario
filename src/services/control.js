@@ -35,7 +35,7 @@ function assertOwner(job, actorId) {
 }
 
 async function getOwnedJob(pool, jobId, actorId, forUpdate = false) {
-  const { rows } = await pool.query(`SELECT * FROM trabajos WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`, [jobId])
+  const { rows } = await pool.query(`SELECT id,encargado_id,titulo,estado,fin_previsto,duracion_minutos${forUpdate ? ' FROM trabajos WHERE id=$1 FOR UPDATE' : ' FROM trabajos WHERE id=$1'}`, [jobId])
   if (!rows[0]) throw notFound('Trabajo no encontrado.')
   assertOwner(rows[0], actorId)
   return rows[0]

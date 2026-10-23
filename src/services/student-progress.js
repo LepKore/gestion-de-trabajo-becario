@@ -17,7 +17,7 @@ export async function listStudentProgress(pool, filters) {
 
   const total = await pool.query(`WITH resumen AS (${resumen}) SELECT count(*)::int AS total FROM resumen ${where}`, values)
   const totalFilas = total.rows[0].total
-  const { rows } = await pool.query(`WITH resumen AS (${resumen}) SELECT * FROM resumen ${where}
+  const { rows } = await pool.query(`WITH resumen AS (${resumen}) SELECT id,nombre,correo,codigo,carrera,semestre,meta_minutos,acreditados FROM resumen ${where}
     ORDER BY lower(nombre),codigo,id LIMIT $3 OFFSET $4`,
   [...values, filters.pageSize, (filters.page - 1) * filters.pageSize])
 
