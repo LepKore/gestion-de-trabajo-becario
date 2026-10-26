@@ -11,7 +11,7 @@ esa fase ANTES de escribir o modificar código.
 
 ## Reglas (obligatorias)
 
-- **Solo skills locales**: esta skill solo nombra skills del proyecto (`mibeca-sdd-router`, `spec-driven-development`, `api-contract-validation`, `database-migration-safety`, `deploy-checklist`). Nunca menciones skills globales por nombre.
+- **Solo skills locales**: esta skill solo nombra skills del proyecto (`mibeca-sdd-router`, `api-contract-validation`, `database-migration-safety`, `deploy-checklist`). Nunca menciones skills globales por nombre.
 - **Si ninguna skill local encaja**: solo entonces analiza las skills globales disponibles en tu entorno, elige la que mejor coincida con la instrucción y úsala. Razona la elección en una línea.
 - **Si tampoco hay global que encaje**: implementa de forma normal sin skills y termina la respuesta anunciando: «No se usaron skills para esta tarea: ninguna skill aplicaba a [tipo de trabajo]».
 
@@ -19,8 +19,8 @@ esa fase ANTES de escribir o modificar código.
 
 | Instrucción típica | Skills locales a cargar |
 |---|---|
-| "implementa / añade la funcionalidad X" | Sin spec previa: `spec-driven-development` desde fase Specify; con spec o "tarea N": implementación. Siempre que toque API o SQL: `api-contract-validation` / `database-migration-safety`. Si no hay skill local para el resto del trabajo de implementación, aplica la regla de fallback global de arriba. |
-| "cambia el contrato / openapi / el esquema" | Especificación primero: `spec-driven-development`; luego `api-contract-validation`; las migraciones solo después, con `database-migration-safety`. El coordinador mantiene el contrato y su edición es de un único responsable. |
+| "implementa / añade la funcionalidad X" | Sin spec previa: usar los comandos slash de Spec Kit (`/speckit.specify` → `/speckit.plan` → `/speckit.tasks` → `/speckit.implement`). Con spec o "tarea N": implementación. Siempre que toque API o SQL: `api-contract-validation` / `database-migration-safety`. Si no hay skill local para el resto del trabajo de implementación, aplica la regla de fallback global de arriba. |
+| "cambia el contrato / openapi / el esquema" | Especificación primero: comandos slash Spec Kit (`/speckit.specify` → `/speckit.plan`). Luego `api-contract-validation`; las migraciones solo después, con `database-migration-safety`. El coordinador mantiene el contrato y su edición es de un único responsable. |
 | "arregla este bug / fallan los tests" | Si el bug toca contrato o migraciones, añade las skills locales correspondientes. Para el resto del análisis, aplica la regla de fallback global. Las pruebas corren con `node:test` en `mibeca_test` local. |
 | "despliega / sube a producción / revisa CI" | `deploy-checklist` como plantilla de verificación. Despliegues y migraciones remotas son informativos: exigen confirmación humana explícita. Recordar rotar la contraseña de Supabase expuesta el 18-10-2026 antes de cualquier despliegue. |
 | "explora / ¿cómo funciona X?" | Graph primero (codebase-memory), fallback a read/grep. No editar. |

@@ -40,6 +40,33 @@ El 21-10-2026 se añadió el auditor de código local con motor puro en `.openco
 
 El 22-10-2026 se amplió `GET /jobs/{id}/applications` con el progreso de beca del estudiante: `estudiante` incluye `semester`, `targetMinutes`, `accreditedMinutes` y `remainingMinutes` (suma de `asistencias.minutos_acreditados` de todas sus postulaciones, misma semántica que `GET /students/progress`). Es aditivo: `/me/applications` conserva el shape anterior. Contrato a 1.4.0. Verificado: `test/jobs.test.js` 9/9 y el resto de la suite en verde.
 
+## 5b. Spec Kit (Spec-Driven Development Toolkit)
+
+Spec Kit (github.com/github/spec-kit, v1.2.4.dev0) es el marco de trabajo SDD del proyecto, instalado el 26-10-2026. Reemplaza la skill `spec-driven-development` (eliminada).
+
+**¿Qué es?** Un CLI `specify` + directorio `.specify/` con plantillas y comandos slash. No es un agente: los agentes leen los archivos de `.specify/` y los siguen.
+
+**Comandos slash disponibles en OpenCode:**
+- `/speckit.constitution` — Principios gobernantes del proyecto
+- `/speckit.specify` — Crear especificación (.specify/spec.md)
+- `/speckit.clarify` — Aclarar áreas ambiguas (opcional, antes de /speckit.plan)
+- `/speckit.plan` — Plan técnico (.specify/plan.md)
+- `/speckit.tasks` — Lista de tareas (.specify/tasks.md)
+- `/speckit.analyze` — Análisis de consistencia entre artifacts (opcional)
+- `/speckit.checklist` — Checklist de calidad (opcional)
+- `/speckit.implement` — Ejecutar implementación
+- `/speckit.converge` — Evaluar codebase y añadir tareas pendientes
+
+**Estructura:** `.specify/` contiene `templates/` (spec-template.md, plan-template.md, tasks-template.md, constitution-template.md, checklist-template.md), `scripts/powershell/`, `workflows/speckit/workflow.yml`, `memory/constitution.md` (plantilla sin completar), `integrations/opencode.manifest.json` y `integration.json`.
+
+**Flujo:** constitution → specify → clarify → plan → tasks → analyze → implement. Cada fase se guarda en `.specify/` y requiere aprobación humana antes de pasar a la siguiente.
+
+**Comandos CLI:** `specify --version`, `specify check`, `specify init . --here --integration opencode --force --non-interactive`.
+
+**Relación con el flujo existente:** El plan canónico del proyecto es `docs/PLAN_MVP_MIBECA.md`. Spec Kit complementa el flujo de desarrollo (especificación → plan → tareas → implementación) pero no reemplaza los documentos del proyecto. Los artifacts de Spec Kit (.specify/spec.md, .specify/plan.md) son para trabajo nuevo no cubierto por el plan existente.
+
+**Instalación:** `uv tool install specify-cli --from git+https://github.com/github/spec-kit.git`. Requiere `uv` (instalar con `Invoke-WebRequest -Uri https://astral.sh/uv/install.ps1 -OutFile $env:TEMP\uv.ps1; . $env:TEMP\uv.ps1`).
+
 ## 6. Límites y siguientes tareas
 
 No inferir que documentos propuestos son funcionalidades implementadas. El siguiente cambio de dominio requiere cerrar contrato, esquema y reglas del plan, después migraciones y pruebas. Entregar al coordinador rutas, resultados, riesgos y cambios de contrato que necesite frontend. No ejecutar despliegues ni migraciones remotas por iniciativa del perfil.
