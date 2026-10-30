@@ -1,8 +1,9 @@
 import { Router } from 'express'
 import { parse, usuarioIdSchema } from '../lib/validation.js'
-import { jobFields, editJobSchema, emptySchema, jobsQuerySchema, applicationsQuerySchema } from '../lib/jobs-validation.js'
+import { jobFields, editJobSchema, emptySchema, jobsQuerySchema, applicationsQuerySchema, evaluationSchema } from '../lib/jobs-validation.js'
 import { requireSession, requireRole, requireCsrf, requireNoPendingPasswordChange } from '../middleware/auth.js'
-import { getJob, listJobs, createJob, editJob, applyJob, decideApplication, listApplications } from '../services/jobs.js'
+import { getJob, listJobs, createJob, editJob, applyJob, decideApplication, listApplications, getRating } from '../services/jobs.js'
+import { createEvaluation } from '../services/jobs.js'
 
 export function jobsRouter({ config }) {
   const router = Router()
@@ -17,6 +18,7 @@ export function jobsRouter({ config }) {
   router.get('/jobs', ...auth, handle(async (req, res, pool) => res.json(await listJobs(pool, parse(jobsQuerySchema, req.query)))))
   router.get('/me/jobs', ...auth, owner, handle(async (req, res, pool) => res.json(await listJobs(pool, parse(jobsQuerySchema, req.query), req.usuario.id))))
   router.get('/me/applications', ...auth, student, handle(async (req, res, pool) => res.json(await listApplications(pool, parse(applicationsQuerySchema, req.query), { actorId: req.usuario.id }))))
+  router.get('/me/rating', ...auth, student, handle(async (req, res, pool) => res.json({ data: await getRating(pool, req.usuario.id) })))
   router.post('/jobs', ...auth, owner, write, handle(async (req, res, pool) => res.status(201).json({ data: await createJob(pool, parse(jobFields, req.body), req.usuario.id) })))
   router.get('/jobs/:id', ...auth, handle(async (req, res, pool) => res.json({ data: await getJob(pool, id(req)) })))
   router.patch('/jobs/:id', ...auth, owner, write, handle(async (req, res, pool) => res.json({ data: await editJob(pool, id(req), parse(editJobSchema, req.body), req.usuario.id) })))
@@ -31,5 +33,8 @@ export function jobsRouter({ config }) {
       res.json({ data: await decideApplication(pool, id(req), req.usuario.id, state) })
     }))
   }
+  router.post('/applications/:id/evaluation', ...auth, owner, write, handle(async (req, res, pool) => {
+    res.status(201).json({ data: await createEvaluation(pool, id(req), parse(evaluationSchema, req.body), req.usuario.id) })
+  }))
   return router
 }

@@ -1,4 +1,4 @@
-import { badRequest, conflict, forbidden, fromDatabaseError, notFound } from '../lib/errors.js'
+import { badRequest, conflict, evaluationConflict, forbidden, fromDatabaseError, notFound } from '../lib/errors.js'
 
 const selectJob = `SELECT t.*, u.nombre AS encargado_nombre,
   (SELECT count(*)::int FROM postulaciones p WHERE p.trabajo_id=t.id AND p.estado='ACEPTADA') AS aceptados
@@ -151,4 +151,45 @@ export async function listApplications(pool, filters, { jobId = null, actorId })
       : { trabajo: jobs.get(row.trabajo_id) }),
   }))
   return pageResult(data, count.rows[0].total, filters)
+}
+
+export function selectLastRealized(rows, limit = 10) {
+  return [...rows].sort((a, b) => Number(new Date(b.cerrado_en)) - Number(new Date(a.cerrado_en)) || String(a.postulacion_id).localeCompare(String(b.postulacion_id))).slice(0, limit)
+}
+
+export function averageEvaluations(rows) {
+  const values = rows.map(row => row.promedio).filter(value => value !== null && value !== undefined).map(Number)
+  return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null
+}
+
+export async function getRating(pool, studentId) {
+  const { rows } = await pool.query(`SELECT p.id AS postulacion_id, c.cerrado_en, e.promedio
+    FROM postulaciones p JOIN trabajos t ON t.id=p.trabajo_id
+    JOIN cierres c ON c.trabajo_id=t.id JOIN asistencias a ON a.postulacion_id=p.id
+    LEFT JOIN evaluaciones e ON e.postulacion_id=p.id
+    WHERE p.estudiante_id=$1 AND t.estado='CERRADO' AND a.asistio=true`, [studentId])
+  const realized = selectLastRealized(rows)
+  return { rating: realized.length < 10 ? null : averageEvaluations(realized), trabajosRealizados: realized.length, evaluacionesConsideradas: realized.filter(row => row.promedio !== null).length, message: realized.length < 10 ? 'faltan realizar trabajos' : null }
+}
+
+export async function createEvaluation(pool, applicationId, data, evaluatorId) {
+  return transaction(pool, async client => {
+    const { rows } = await client.query(`SELECT p.id,p.estado,p.estudiante_id,t.estado AS trabajo_estado,t.encargado_id,
+      a.asistio FROM postulaciones p JOIN trabajos t ON t.id=p.trabajo_id
+      LEFT JOIN asistencias a ON a.postulacion_id=p.id WHERE p.id=$1 FOR UPDATE OF p,t`, [applicationId])
+    const application = rows[0]
+    if (!application) throw notFound('Postulación no encontrada.')
+    if (application.encargado_id !== evaluatorId) throw forbidden('Solo el encargado propietario puede evaluar.')
+    if (application.trabajo_estado !== 'CERRADO' || application.estado !== 'ACEPTADA' || application.asistio !== true) throw conflict('evaluacion_no_disponible', 'La evaluación requiere trabajo cerrado y asistencia confirmada.')
+    try {
+      const result = await client.query(`INSERT INTO evaluaciones(postulacion_id,evaluador_id,responsabilidad,puntualidad,proactividad,comunicacion)
+        VALUES($1,$2,$3,$4,$5,$6) RETURNING id,postulacion_id,responsabilidad,puntualidad,proactividad,comunicacion,promedio,creado_en`,
+      [applicationId, evaluatorId, data.responsabilidad, data.puntualidad, data.proactividad, data.comunicacion])
+      const row = result.rows[0]
+      return { id: row.id, postulacionId: row.postulacion_id, responsabilidad: row.responsabilidad, puntualidad: row.puntualidad, proactividad: row.proactividad, comunicacion: row.comunicacion, promedio: Number(row.promedio), creadoEn: row.creado_en }
+    } catch (error) {
+      if (error?.code === '23505') throw evaluationConflict()
+      throw error
+    }
+  })
 }

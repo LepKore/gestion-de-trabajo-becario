@@ -1,50 +1,39 @@
-# [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!--
+Sync Impact Report:
+- Version change: 1.1.0 → 1.0.0
+- Replaced: "MiBeca Dual-Repository Constitution" with "MiBeca Backend API Constitution" - focused constitution for backend API domain only
+- Modified principles: II. Synchronized Cross-Repository Progression (clarified backend-specific coordination)
+- Follow-up TODOs: Ensure frontend repository constitution continues to provide cross-repository coordination rules.
+-->
+
+# MiBeca Backend API Constitution
 
 ## Core Principles
 
-### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
-[PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+### I. Canonical API & Integration
+Backend API endpoints and data contracts are canonical and shared with the frontend repository (`gestion-de-trabajo-becario-web`). API schemas and interface definitions must be complete and consistent; no backend may define independent mock contracts once integration is underway.
 
-### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
-[PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+### II. Synchronized Cross-Repository Progression
+Backend development MUST proceed in coordination with the web repository. When a backend task is blocked by an incomplete web task, developers MUST pivot to advancing the blocking web task's queue until unblocked, and vice-versa.
+- *Rule:* If Backend Task N cannot continue because Web Task M is incomplete, and Web Task M requires preceding tasks, continue sequentially on web tasks until web progress is blocked by a backend dependency, and vice-versa.
 
-### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
-[PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+### III. Test-First & Quality Gates (NON-NEGOTIABLE)
+All features, contract integrations, and bug fixes MUST adhere to test-driven development and strict quality gates (`npm run lint`, `npm run build`, and unit/integration tests). No bypassing of checks, lint suppressions, or stubbing without tests is permitted.
 
-### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
-[PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+### IV. Integration Testing & Contract Verification
+Focus areas requiring integration tests: New API endpoint tests, Contract changes, Inter-service communication, Shared schemas between backend and web repositories.
 
-### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
-[PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+### V. Simplicity, YAGNI & Incremental Delivery
+Deliver work in thin, verifiable, atomic slices. Avoid over-engineering, unrequested abstractions, or parallel custom specs. Every endpoint or service must directly serve the MVP plan.
 
-## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+## Development Workflow & Review Process
 
-[SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
-
-## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
-
-[SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+1. **Code Review & Quality:** All changes must pass linting, type checking, and test suites locally before PR submission.
+2. **Security & Auth:** Backend enforces actual authorization and role security; frontend respects these permissions without client-side permission bypasses.
+3. **Documentation:** Architectural decisions, API contract modifications, and core changes must be recorded in project documentation.
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
 
-[GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+This Constitution supersedes all other practices and informal guidelines across both MiBeca repositories. Amendments require documentation, explicit team agreement, and a migration plan. Compliance is verified during code reviews, automated PR quality gates, and spec validation.
 
-**Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+**Version**: 1.0.0 | **Ratified**: 2026-03-30 | **Last Amended**: 2026-03-30

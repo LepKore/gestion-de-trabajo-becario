@@ -105,6 +105,37 @@ it('edición y aceptación simultáneas se serializan y fijan las condiciones ac
   assert.equal(final.duracionMinutos, edit.status === 200 ? 120 : 60)
   assert.equal((await owner.patch(`/api/v1/jobs/${created.id}`, { duracionMinutos: 180 })).status, 409)
 })
+
+it('rating exige autenticación y devuelve faltan trabajos antes de promediar', async () => {
+  assert.equal((await ctx.get('/api/v1/me/rating')).status, 401)
+  const response = await second.get('/api/v1/me/rating')
+  assert.equal(response.status, 200, JSON.stringify(response.body))
+  assert.equal(response.body.data.rating, null)
+  assert.equal(response.body.data.message, 'faltan realizar trabajos')
+})
+
+it('rating integra diez trabajos realizados, excluye evaluaciones ausentes y conserva el orden temporal', async () => {
+  const applications = []
+  for (let index = 0; index < 10; index += 1) {
+    const created = await job({ titulo: `Rating ${index}` })
+    const application = await apply(second, created.id)
+    assert.equal((await owner.post(`/api/v1/applications/${application.id}/accept`, {})).status, 200)
+    await ctx.pool.query("UPDATE trabajos SET inicio_previsto=clock_timestamp()-interval '2 hours',fin_previsto=clock_timestamp()-interval '1 hour' WHERE id=$1", [created.id])
+    const closed = await owner.post(`/api/v1/jobs/${created.id}/close`, { attendance: [{ applicationId: application.id, attended: true }] }, { 'Idempotency-Key': `rating-${created.id}` })
+    assert.equal(closed.status, 200, JSON.stringify(closed.body))
+    applications.push(application.id)
+  }
+  for (const id of applications.slice(0, 9)) {
+    await ctx.pool.query(`INSERT INTO evaluaciones(postulacion_id,evaluador_id,responsabilidad,puntualidad,proactividad,comunicacion)
+      VALUES($1,$2,5,4,5,4)`, [id, owner.id])
+  }
+  const response = await second.get('/api/v1/me/rating')
+  assert.equal(response.status, 200, JSON.stringify(response.body))
+  assert.equal(response.body.data.trabajosRealizados, 10)
+  assert.equal(response.body.data.evaluacionesConsideradas, 9)
+  assert.equal(response.body.data.rating, 4.5)
+  assert.equal(response.body.data.message, null)
+})
 async function waitForJobLock() {
   const deadline = Date.now() + 3000
   while (Date.now() < deadline) {

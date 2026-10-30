@@ -15,6 +15,7 @@
     "db:create-admin": "node --env-file=.env scripts/create-admin.js",
     "db:bootstrap-admin": "node --env-file=.env scripts/bootstrap-admin.js",
     "test": "node --env-file-if-exists=.env --test --test-concurrency=1 \"test/*.test.js\"",
+    "lint": "eslint .",
     "check": "node scripts/check-syntax.js",
     "audit:changed": "node .codex/hooks/audit_bridge.mjs --changed",
     "audit:all": "node .codex/hooks/audit_bridge.mjs --all --info",
@@ -29,6 +30,7 @@
     "zod": "^4.6.7"
   },
   "devDependencies": {
+    "eslint": "^10.13.0",
     "typescript": "^5.9.3"
   }
 }

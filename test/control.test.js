@@ -182,6 +182,18 @@ it('aplica rol, propiedad, CSRF y validacion de clave a las nuevas rutas', async
   assert.match(preflight.headers.get('access-control-allow-headers'), /Idempotency-Key/)
 })
 
+it('la asistencia es la única fuente de minutos acreditados y queda registrada por aplicación', async () => {
+  const jobId = await createJob(60)
+  const applicationId = await apply(first, jobId, true)
+  const before = (await first.get('/api/v1/me/progress')).body.data.accreditedMinutes
+  await finish(jobId)
+  assert.equal((await close(jobId, [{ applicationId, attended: true }])).status, 200)
+  const attendance = await ctx.pool.query('SELECT asistio,minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
+  assert.deepEqual(attendance.rows[0], { asistio: true, minutos_acreditados: 60 })
+  assert.equal((await first.get('/api/v1/me/progress')).body.data.accreditedMinutes - before, 60)
+  assert.equal((await ctx.pool.query('SELECT count(*)::int AS n FROM evaluaciones WHERE postulacion_id=$1', [applicationId])).rows[0].n, 0)
+})
+
 it('ADMIN filtra el progreso de estudiantes y consulta su historial; otros roles quedan excluidos', async () => {
   const pendingSuffix = `pending-progress-${++counter}`
   const completeSuffix = `complete-progress-${++counter}`
@@ -238,4 +250,23 @@ it('el resumen del encargado agrega únicamente sus trabajos y estados', async (
   assert.equal((await other.get('/api/v1/me/dashboard')).body.data.totalJobs, 0)
   assert.equal((await admin.get('/api/v1/me/dashboard')).status, 403)
   assert.equal((await first.get('/api/v1/me/dashboard')).status, 403)
+})
+
+it('la evaluación no modifica horas acreditadas ni progreso', async () => {
+  const jobId = await createJob(60, 1)
+  const applicationId = await apply(first, jobId, true)
+  await finish(jobId)
+  assert.equal((await close(jobId, [{ applicationId, attended: true }])).status, 200)
+
+  const before = (await first.get('/api/v1/me/progress')).body.data
+  const evaluation = await owner.post(`/api/v1/applications/${applicationId}/evaluation`, {
+    responsabilidad: 5, puntualidad: 4, proactividad: 5, comunicacion: 4,
+  })
+  assert.equal(evaluation.status, 201, JSON.stringify(evaluation.body))
+  assert.equal(evaluation.body.data.promedio, 4.5)
+
+  const after = (await first.get('/api/v1/me/progress')).body.data
+  assert.deepEqual(after, before)
+  const stored = await ctx.pool.query('SELECT minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
+  assert.equal(stored.rows[0].minutos_acreditados, 60)
 })

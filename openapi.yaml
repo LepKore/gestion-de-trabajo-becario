@@ -922,6 +922,58 @@ paths:
           $ref: "#/components/responses/ErrorNoEncontrado"
         409:
           $ref: "#/components/responses/ErrorConflicto"
+  /me/rating:
+    get:
+      tags: ["Evaluaciones"]
+      operationId: "consultarMiRating"
+      summary: "Consulta la calificación del becario autenticado"
+      description: "Selecciona los últimos 10 trabajos realizados (cerrados con asistencia confirmada) y promedia solo las evaluaciones disponibles."
+      security:
+        - cookieAuth: []
+      responses:
+        200:
+          description: "Calificación agregada"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/RatingBecario' }
+        401: { $ref: '#/components/responses/ErrorNoAutorizado' }
+        403: { $ref: '#/components/responses/ErrorProhibido' }
+  /applications/{id}/evaluation:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    post:
+      tags: ["Evaluaciones"]
+      operationId: "crearEvaluacion"
+      summary: "Registra una evaluación inmutable"
+      description: "Solo ENCARGADO propietario de un trabajo CERRADO con postulación ACEPTADA y asistencia confirmada. La evaluación no modifica horas."
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluacionInput' }
+      responses:
+        201:
+          description: "Evaluación creada"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Evaluacion' }
+        400: { $ref: '#/components/responses/ErrorValidacion' }
+        401: { $ref: '#/components/responses/ErrorNoAutorizado' }
+        403: { $ref: '#/components/responses/ErrorProhibido' }
+        404: { $ref: '#/components/responses/ErrorNoEncontrado' }
+        409: { $ref: '#/components/responses/ErrorConflicto' }
 
   /jobs/{id}/close:
     parameters:
@@ -1173,6 +1225,33 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    EvaluacionInput:
+      type: object
+      additionalProperties: false
+      required: [responsabilidad, puntualidad, proactividad, comunicacion]
+      properties:
+        responsabilidad: { type: integer, minimum: 1, maximum: 5 }
+        puntualidad: { type: integer, minimum: 1, maximum: 5 }
+        proactividad: { type: integer, minimum: 1, maximum: 5 }
+        comunicacion: { type: integer, minimum: 1, maximum: 5 }
+    Evaluacion:
+      allOf:
+        - $ref: '#/components/schemas/EvaluacionInput'
+        - type: object
+          required: [id, postulacionId, promedio, creadoEn]
+          properties:
+            id: { type: string, format: uuid }
+            postulacionId: { type: string, format: uuid }
+            promedio: { type: number, minimum: 1, maximum: 5 }
+            creadoEn: { type: string, format: date-time }
+    RatingBecario:
+      type: object
+      required: [rating, trabajosRealizados, evaluacionesConsideradas, message]
+      properties:
+        rating: { type: [number, 'null'], minimum: 1, maximum: 5 }
+        trabajosRealizados: { type: integer, minimum: 0 }
+        evaluacionesConsideradas: { type: integer, minimum: 0 }
+        message: { type: [string, 'null'], enum: ['faltan realizar trabajos', null] }
     TrabajoInput:
       type: "object"
       additionalProperties: false

@@ -16,6 +16,7 @@ export const unauthorized = (message = 'No autenticado') =>
 export const forbidden = (message = 'No autorizado') => new HttpError(403, 'forbidden', message)
 export const notFound = (message = 'Recurso no encontrado') => new HttpError(404, 'not_found', message)
 export const conflict = (code, message) => new HttpError(409, code, message)
+export const evaluationConflict = (message = 'La postulación ya tiene una evaluación.') => conflict('evaluacion_duplicada', message)
 export const tooManyRequests = (message = 'Demasiados intentos. Intenta más tarde.') =>
   new HttpError(429, 'too_many_attempts', message)
 

@@ -15,3 +15,9 @@ export const emptySchema = z.object({}).strict()
 const pagination = { page: z.coerce.number().int().min(1).max(2147483647).default(1), pageSize: z.coerce.number().int().min(1).max(50).default(20) }
 export const jobsQuerySchema = z.object({ ...pagination, estado: z.enum(['PUBLICADO', 'CERRADO']).optional(), q: z.string().trim().min(1).max(100).optional() }).strict()
 export const applicationsQuerySchema = z.object({ ...pagination, estado: z.enum(['PENDIENTE', 'ACEPTADA', 'RECHAZADA']).optional() }).strict()
+export const evaluationSchema = z.object({
+  responsabilidad: z.number().int().min(1).max(5),
+  puntualidad: z.number().int().min(1).max(5),
+  proactividad: z.number().int().min(1).max(5),
+  comunicacion: z.number().int().min(1).max(5),
+}).strict()
