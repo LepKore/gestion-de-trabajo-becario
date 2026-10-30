@@ -269,4 +269,12 @@ it('la evaluación no modifica horas acreditadas ni progreso', async () => {
   assert.deepEqual(after, before)
   const stored = await ctx.pool.query('SELECT minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
   assert.equal(stored.rows[0].minutos_acreditados, 60)
+  for (const result of [
+    await first.get('/api/v1/me/history'),
+    await owner.get('/api/v1/me/history'),
+    await admin.get('/api/v1/students/progress'),
+  ]) {
+    assert.equal(result.status, 200)
+    assert.doesNotMatch(JSON.stringify(result.body), /"(?:promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
+  }
 })

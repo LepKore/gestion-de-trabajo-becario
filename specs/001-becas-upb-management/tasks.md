@@ -84,16 +84,16 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 
 ### Tests for User Story 2
 
-- [ ] T016 [P] [US2] Add authorization matrix tests for evaluation, rating, attendance, and compliance operations in `test/authorization.test.js`
-- [ ] T017 [P] [US2] Add integration tests for owner-only, `CERRADO`-only, confirmed-attendance-only, duplicate, range, immutable, and no-hour-change rules in `test/jobs-evaluation.test.js`
-- [ ] T018 [P] [US2] Add contract tests for the evaluation request and `201/400/401/403/404/409` responses against `openapi.yaml` in `test/contracts/evaluations.test.js`
+- [X] T016 [P] [US2] Add authorization matrix tests for evaluation, rating, attendance, and compliance operations in `test/authorization.test.js`
+- [X] T017 [P] [US2] Add integration tests for owner-only, `CERRADO`-only, confirmed-attendance-only, duplicate, range, immutable, and no-hour-change rules in `test/jobs-evaluation.test.js`
+- [X] T018 [P] [US2] Add contract tests for the evaluation request and `201/400/401/403/404/409` responses against `openapi.yaml` in `test/contracts/evaluations.test.js`
 
 ### Implementation for User Story 2
 
-- [ ] T019 [US2] Implement `createEvaluation` in `src/services/jobs.js` with ownership, role, closure, attendance, duplicate, and immutability checks after T016–T018 are failing tests
-- [ ] T020 [US2] Implement `POST /applications/:id/evaluation` in `src/routes/jobs.js` using the validation schema and service from T005 and T019
-- [ ] T021 [US2] Integrate evaluation eligibility with existing closure and attendance records in `src/services/control.js` and `src/services/jobs.js` without moving hour accreditation into evaluation
-- [ ] T022 [US2] Return only contract-approved evaluation data to the owning encargado in `src/routes/jobs.js`; preserve existing application and attendance response shapes
+- [X] T019 [US2] Implement `createEvaluation` in `src/services/jobs.js` with ownership, role, closure, attendance, duplicate, and immutability checks after T016–T018 are failing tests
+- [X] T020 [US2] Implement `POST /applications/:id/evaluation` in `src/routes/jobs.js` using the validation schema and service from T005 and T019
+- [X] T021 [US2] Integrate evaluation eligibility with existing closure and attendance records in `src/services/control.js` and `src/services/jobs.js` without moving hour accreditation into evaluation
+- [X] T022 [US2] Return only contract-approved evaluation data to the owning encargado in `src/routes/jobs.js`; preserve existing application and attendance response shapes
 
 **Checkpoint**: US2 is independently testable after T016–T018 fail first and T019–T022 pass.
 
@@ -107,14 +107,14 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 
 ### Tests for User Story 3
 
-- [ ] T023 [P] [US3] Add integration tests for administrative compliance authorization and response fields in `test/control-admin.test.js`
-- [ ] T024 [P] [US3] Add regression tests proving progress and history remain sourced only from attendance accreditation and expose no evaluation scores in `test/control.test.js`
+- [X] T023 [P] [US3] Add integration tests for administrative compliance authorization and response fields in `test/control-admin.test.js`
+- [X] T024 [P] [US3] Add regression tests proving progress and history remain sourced only from attendance accreditation and expose no evaluation scores in `test/control.test.js`
 
 ### Implementation for User Story 3
 
-- [ ] T025 [US3] Identify and document the administrative compliance endpoint and canonical response fields in `src/routes/control.js` and `openapi.yaml`
-- [ ] T026 [US3] Verify pending/completed-hour aggregation uses only attendance accreditation in `src/services/control.js`
-- [ ] T027 [US3] Implement or adjust the single-response administrative compliance result in `src/routes/control.js` without exposing evaluation fields
+- [X] T025 [US3] Identify and document the administrative compliance endpoint and canonical response fields in `src/routes/control.js` and `openapi.yaml`
+- [X] T026 [US3] Verify pending/completed-hour aggregation uses only attendance accreditation in `src/services/control.js`
+- [X] T027 [US3] Implement or adjust the single-response administrative compliance result in `src/routes/control.js` without exposing evaluation fields
 
 **Checkpoint**: US3 is independently testable after T023–T024 fail first and T025–T027 pass.
 
@@ -124,9 +124,9 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 
 **Purpose**: Validate the complete feature, security boundaries, performance targets, documentation, and traceability.
 
-- [ ] T028 [P] Verify all evaluation endpoints and schemas against the reviewed `openapi.yaml` revision in `test/contracts/evaluations.test.js`
-- [ ] T029 [P] Run the security audit for role and ownership checks in `src/routes/jobs.js`, `src/services/jobs.js`, and `src/routes/control.js`
-- [ ] T030 [P] Measure SC-001 and SC-002 using at least 100 jobs, 1,000 applications, and 20 authenticated requests; record p95 results in `specs/001-becas-upb-management/quickstart.md`
+- [X] T028 [P] Verify all evaluation endpoints and schemas against the reviewed `openapi.yaml` revision in `test/contracts/evaluations.test.js`
+- [X] T029 [P] Run the security audit for role and ownership checks in `src/routes/jobs.js`, `src/services/jobs.js`, and `src/routes/control.js`
+- [X] T030 [P] Measure SC-001 and SC-002 using at least 100 jobs, 1,000 applications, and 20 authenticated requests; record p95 results in `specs/001-becas-upb-management/quickstart.md`
 - [ ] T031 [P] Verify every credited minute is traceable to one closed job, one attendance record, and one accepted application in `test/control.test.js`
 - [ ] T032 [P] Run the scenarios in `specs/001-becas-upb-management/quickstart.md` and record results
 - [ ] T033 [P] Update `docs/AI_CONTEXT.md` with the implemented evaluation module status

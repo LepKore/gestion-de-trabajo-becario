@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.4.0
+  version: 1.5.0
   description: >-
     Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
     Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
@@ -927,7 +927,7 @@ paths:
       tags: ["Evaluaciones"]
       operationId: "consultarMiRating"
       summary: "Consulta la calificación del becario autenticado"
-      description: "Selecciona los últimos 10 trabajos realizados (cerrados con asistencia confirmada) y promedia solo las evaluaciones disponibles."
+      description: "Solo BECARIO autenticado. Selecciona los últimos 10 trabajos realizados (cerrados con asistencia confirmada) y promedia solo las evaluaciones disponibles."
       security:
         - cookieAuth: []
       responses:
@@ -1106,6 +1106,22 @@ paths:
                   - $ref: '#/components/schemas/HistorialBecario'
                   - $ref: '#/components/schemas/HistorialEncargado'
         '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/compliance:
+    get:
+      tags: [Control]
+      operationId: consultarCumplimientoEstudiantes
+      summary: Consulta el cumplimiento de horas de todos los becarios en una respuesta
+      description: Solo ADMIN. Incluye estudiantes activos e inactivos; las horas provienen de asistencia, nunca de evaluaciones.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Cumplimiento institucional completo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CumplimientoEstudiantes' }
         '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
         '403': { $ref: '#/components/responses/ErrorProhibido' }
 
@@ -1552,6 +1568,25 @@ components:
         accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    CumplimientoEstudiantes:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, code, targetMinutes, accreditedMinutes, remainingMinutes, completed]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              code: { type: string, pattern: '^[0-9]{5}$' }
+              targetMinutes: { type: integer, minimum: 6, multipleOf: 6 }
+              accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              completed: { type: boolean }
     ProgresoEstudiantes:
       type: object
       additionalProperties: false

@@ -14,7 +14,7 @@
     "db:migrate:env": "node scripts/migrate.js",
     "db:create-admin": "node --env-file=.env scripts/create-admin.js",
     "db:bootstrap-admin": "node --env-file=.env scripts/bootstrap-admin.js",
-    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 \"test/*.test.js\"",
+    "test": "node --env-file-if-exists=.env --test --test-concurrency=1 \"test/*.test.js\" \"test/contracts/*.test.js\"",
     "lint": "eslint .",
     "check": "node scripts/check-syntax.js",
     "audit:changed": "node .codex/hooks/audit_bridge.mjs --changed",

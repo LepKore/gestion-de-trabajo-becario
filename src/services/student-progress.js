@@ -35,3 +35,22 @@ export async function listStudentProgress(pool, filters) {
     meta: { page: filters.page, pageSize: filters.pageSize, total: totalFilas, totalPages: Math.ceil(totalFilas / filters.pageSize) },
   }
 }
+
+export async function listStudentCompliance(pool) {
+  const { rows } = await pool.query(`SELECT u.id,u.nombre,e.codigo,e.meta_minutos,
+      COALESCE(sum(a.minutos_acreditados),0)::bigint AS acreditados
+    FROM estudiantes e JOIN usuarios u ON u.id=e.usuario_id
+    LEFT JOIN postulaciones p ON p.estudiante_id=e.usuario_id
+    LEFT JOIN asistencias a ON a.postulacion_id=p.id
+    GROUP BY u.id,u.nombre,e.codigo,e.meta_minutos
+    ORDER BY lower(u.nombre),e.codigo,u.id`)
+  return rows.map(row => {
+    const targetMinutes = row.meta_minutos
+    const accreditedMinutes = Number(row.acreditados)
+    return {
+      id: row.id, name: row.nombre, code: row.codigo, targetMinutes, accreditedMinutes,
+      remainingMinutes: Math.max(targetMinutes - accreditedMinutes, 0),
+      completed: accreditedMinutes >= targetMinutes,
+    }
+  })
+}
