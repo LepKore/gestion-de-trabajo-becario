@@ -45,6 +45,20 @@ it('documenta la evaluación con CSRF, rol propietario, cuerpo estricto y errore
   }
 })
 
+it('documenta la lectura de evaluaciones guardadas solo en respuestas del encargado', () => {
+  const attendance = section('  /jobs/{id}/attendance:', '  /me/progress:')
+  assert.match(attendance, /ENCARGADO propietario/)
+  assert.match(attendance, /ADMIN no puede usar esta ruta/)
+  const history = section('  /me/history:', '  /students/compliance:')
+  assert.match(history, /evaluación persistida/)
+  assert.match(history, /ADMIN no recibe evaluaciones/)
+  const detail = section('    AsistenciaDetallada:', '    Cierre:')
+  assert.match(detail, /required: \[student, evaluation\]/)
+  assert.match(detail, /evaluation:/)
+  assert.match(detail, /components\/schemas\/Evaluacion/)
+  assert.match(detail, /type: 'null'/)
+})
+
 it('documenta el rating exclusivo del becario y su respuesta', () => {
   const path = section('  /me/rating:', '  /applications/{id}/evaluation:')
   assert.match(path, /Solo BECARIO autenticado/)

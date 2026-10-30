@@ -55,4 +55,5 @@
 - A closure/accreditation request exceeding the job duration MUST be rejected atomically without modifying closed data.
 - Evaluation MUST be immutable: no update or delete operation is exposed.
 - Administrative compliance views MUST derive only from attendance accreditation and MUST NOT expose evaluation scores.
+- Owner-authorized closed-job attendance and owner history MUST include `evaluation: Evaluacion | null`; student and administrative history MUST omit evaluation data.
 - The rating window selects the 10 most recent realized jobs (closed plus confirmed attendance) before averaging available evaluations; missing evaluations are excluded from the numeric average, not treated as zero.

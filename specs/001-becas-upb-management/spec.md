@@ -49,6 +49,7 @@ Work supervisors (encargados) need to publish scholarship job opportunities, man
 1. **Given** an authenticated encargado, **When** they submit a new job posting with title, description, and required hours, **Then** the job becomes visible to becarios.
 2. **Given** applicant submissions for a job, **When** an encargado selects and assigns becarios, **Then** the working relationship is established.
 3. **Given** a closed job with a becario marked as attended, **When** the encargado submits the four ratings, **Then** the values and average are recorded; credited hours remain determined exclusively by attendance closure.
+4. **Given** an evaluation has already been saved, **When** the owner refreshes the closed-job attendance or history, **Then** the saved evaluation and average are returned to that owner, while student and administrator responses omit evaluation data.
 
 ---
 
@@ -88,6 +89,7 @@ System administrators need an overview to monitor overall scholarship hour compl
 - **FR-009**: System MUST enforce role-based access control distinguishing between becarios, encargados, and administrators.
 - **FR-010**: Evaluation MUST NOT create, alter, or remove credited minutes.
 - **FR-011**: Evaluations are immutable in this feature; no edit or delete operation is exposed.
+- **FR-012**: The owner-only closed-job attendance and owner-history responses MUST include each attendance row's saved evaluation or `null`; student and administrative responses MUST NOT expose evaluation scores.
 
 The FR-007 rating algorithm MUST:
 1. Select jobs with status `CERRADO` and confirmed attendance for the authenticated becario.

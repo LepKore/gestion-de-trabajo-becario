@@ -92,6 +92,10 @@ it('valida lista exhaustiva, registra ausencias y rechaza pendientes en un solo 
   assert.equal(ownerHistory.body.data[0].attendance.length, 2)
   const detail = await owner.get(`/api/v1/jobs/${jobId}/attendance`)
   assert.deepEqual(Object.keys(detail.body.data[0].student).sort(), ['career', 'code', 'name'])
+  assert.ok(detail.body.data.every(row => row.evaluation === null))
+  const closedJob = ownerHistory.body.data.find(row => row.job.id === jobId)
+  assert.ok(closedJob)
+  assert.ok(closedJob.attendance.every(row => row.evaluation === null))
 })
 
 it('reintento con clave y contenido equivalentes conserva respuesta y horas; otras claves dan conflicto', async () => {
@@ -269,16 +273,26 @@ it('la evaluación no modifica horas acreditadas ni progreso', async () => {
   assert.deepEqual(after, before)
   const stored = await ctx.pool.query('SELECT minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
   assert.equal(stored.rows[0].minutos_acreditados, 60)
+  const ownerDetail = await owner.get(`/api/v1/jobs/${jobId}/attendance`)
+  const saved = ownerDetail.body.data.find(row => row.applicationId === applicationId).evaluation
+  assert.equal(saved.promedio, 4.5)
+  assert.deepEqual(
+    Object.keys(saved).sort(),
+    ['comunicacion', 'creadoEn', 'id', 'postulacionId', 'promedio', 'proactividad', 'puntualidad', 'responsabilidad'],
+  )
+  const ownerHistory = await owner.get('/api/v1/me/history')
+  const historyRow = ownerHistory.body.data.flatMap(row => row.attendance).find(row => row.applicationId === applicationId)
+  assert.equal(historyRow.evaluation.promedio, 4.5)
+
   for (const result of [
     await first.get('/api/v1/me/progress'),
     await first.get('/api/v1/me/history'),
-    await owner.get('/api/v1/me/history'),
     await admin.get(`/api/v1/students/${first.id}/history`),
     await admin.get('/api/v1/students/compliance'),
     await admin.get('/api/v1/students/progress'),
   ]) {
     assert.equal(result.status, 200)
-    assert.doesNotMatch(JSON.stringify(result.body), /"(?:promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
+    assert.doesNotMatch(JSON.stringify(result.body), /"(?:evaluation|promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
   }
 })
 

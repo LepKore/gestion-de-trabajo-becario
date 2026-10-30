@@ -24,7 +24,7 @@ The feature adds an evaluation module for scholarship jobs, allowing `ENCARGADO`
 
 **Performance Goals**: 100% traceability of credited hours to attendance closure; validate response-time targets with integration tests.
 
-**Constraints**: SQL-based rating calculation, canonical contract in `openapi.yaml`, immutable evaluations, no post-close hour mutation, and no new runtime dependency unless explicitly approved.
+**Constraints**: SQL-based rating calculation, canonical contract in `openapi.yaml`, immutable evaluations, no post-close hour mutation, and no new runtime dependency unless explicitly approved. Saved evaluations are read only through owner-authorized closed-job attendance and owner history; there is no database migration or change to student/admin response shapes.
 
 **Quality Gates**: `npm run check`, `npm test`, `npm run build`, `npm run lint`, contract validation, and the repository audit. `npm run lint` is configured with ESLint and must pass before implementation completion.
 

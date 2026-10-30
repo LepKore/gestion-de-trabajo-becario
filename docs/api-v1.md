@@ -1,6 +1,6 @@
 # MiBeca API v1 — resumen subordinado al contrato
 
-**Estado (29-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control, Supervisión y evaluación backend están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.5.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance v1; la spec `001-becas-upb-management` concreta la evaluación. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
+**Estado (30-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control, Supervisión y evaluación backend están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.6.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance v1; la spec `001-becas-upb-management` concreta la evaluación. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
 
 ## Convenciones acordadas
 

@@ -192,3 +192,5 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 - [X] T041 [P] Add automated contract validation for both evaluation endpoints, their schemas, authorization metadata, and documented error responses against the canonical `openapi.yaml`, per T028 and Constitution I/IV (missing).
 - [X] T042 Add a traceability test proving every credited minute references one accepted application, one closed job, and one attendance record, and that evaluations are absent from the accreditation path, per T031 and SC-005 (missing).
 - [X] T043 [P] Execute the evaluation and rating scenarios in `quickstart.md`, record pass/fail evidence, and update `docs/AI_CONTEXT.md` with the implemented evaluation module status, per T032–T033 (missing).
+
+- [X] T044 [US2] Return each attendance row's `evaluation: Evaluacion | null` from owner-only closed-job attendance and owner history, preserve student/admin response privacy, and cover persistence plus contract shape in `src/services/control.js`, `test/control.test.js`, and `test/contracts/evaluations.test.js`.

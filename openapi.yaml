@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.5.0
+  version: 1.6.0
   description: >-
     Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
     Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
@@ -1022,7 +1022,7 @@ paths:
       tags: [Control]
       operationId: consultarAsistenciaTrabajo
       summary: Consulta asistencia de un trabajo propio cerrado
-      description: Solo ENCARGADO propietario. Devuelve datos básicos del estudiante.
+      description: Solo ENCARGADO propietario. Devuelve asistencia y evaluación persistida cuando exista; ADMIN no puede usar esta ruta.
       security: [{ cookieAuth: [] }]
       responses:
         '200':
@@ -1090,8 +1090,7 @@ paths:
       description: >-
         BECARIO recibe todas sus postulaciones, incluidas abiertas y ausencias;
         attended es null si no se registró asistencia para esa postulación.
-        ENCARGADO recibe solo trabajos propios
-        cerrados y sus asistencias. Orden estable por fecha e ID.
+        ENCARGADO recibe solo trabajos propios cerrados, sus asistencias y la evaluación persistida de cada postulante cuando exista. BECARIO recibe únicamente su historial propio; ADMIN no recibe evaluaciones en las rutas administrativas. Orden estable por fecha e ID.
       security: [{ cookieAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1539,7 +1538,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Asistencia'
         - type: object
-          required: [student]
+          required: [student, evaluation]
           properties:
             student:
               type: object
@@ -1549,6 +1548,10 @@ components:
                 name: { type: string }
                 code: { type: string, pattern: '^[0-9]{5}$' }
                 career: { type: string }
+            evaluation:
+              anyOf:
+                - $ref: '#/components/schemas/Evaluacion'
+                - type: 'null'
     Cierre:
       type: object
       additionalProperties: false
