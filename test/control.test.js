@@ -278,7 +278,7 @@ it('la evaluación no modifica horas acreditadas ni progreso', async () => {
   assert.equal(saved.promedio, 4.5)
   assert.deepEqual(
     Object.keys(saved).sort(),
-    ['comunicacion', 'creadoEn', 'id', 'postulacionId', 'promedio', 'proactividad', 'puntualidad', 'responsabilidad'],
+    ['comunicacion', 'creadoEn', 'id', 'postulacionId', 'proactividad', 'promedio', 'puntualidad', 'responsabilidad'],
   )
   const ownerHistory = await owner.get('/api/v1/me/history')
   const historyRow = ownerHistory.body.data.flatMap(row => row.attendance).find(row => row.applicationId === applicationId)

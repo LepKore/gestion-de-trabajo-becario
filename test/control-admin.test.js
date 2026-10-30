@@ -59,13 +59,15 @@ it('entrega cumplimiento institucional en una respuesta solo a ADMIN y sin calif
     responsabilidad: 5, puntualidad: 4, proactividad: 5, comunicacion: 4,
   })).status, 201)
   assert.deepEqual((await admin.get('/api/v1/students/compliance')).body, beforeRating)
+  const ownerHistory = await owner.get('/api/v1/me/history')
+  const saved = ownerHistory.body.data.flatMap(row => row.attendance).find(row => row.applicationId === applicationId).evaluation
+  assert.equal(saved.promedio, 4.5)
   for (const response of [
     await student.get('/api/v1/me/progress'),
     await student.get('/api/v1/me/history'),
-    await owner.get('/api/v1/me/history'),
     await admin.get(`/api/v1/students/${student.id}/history`),
   ]) {
     assert.equal(response.status, 200)
-    assert.doesNotMatch(JSON.stringify(response.body), /"(?:promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
+    assert.doesNotMatch(JSON.stringify(response.body), /"(?:evaluation|promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
   }
 })
