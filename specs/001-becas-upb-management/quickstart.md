@@ -47,17 +47,17 @@ Environment: local PostgreSQL 17.11 on `127.0.0.1:5433`, Node 24.19.0. These are
 sequential-request results, not a concurrent-load or production guarantee. They satisfy
 the SC-001 2 s and SC-002 500 ms response-time thresholds for this dataset.
 
-## Backend verification (2026-10-29)
+## Backend verification (2026-10-30)
 
 `npm test`: 85/85 passed against the local disposable test database. `npm run lint`,
 `npm run build`, `npm run audit:all` and `git diff --check` passed. Redocly validated
-OpenAPI 1.5.0 with four warnings on pre-existing license, health responses and history
+OpenAPI 1.6.0 with four warnings on pre-existing license, health responses and history
 `oneOf`; none concern the evaluation or compliance paths.
 
 The administrative compliance query lives in `src/services/student-progress.js` and is
 registered by `src/routes/control.js`; it sums only `asistencias.minutos_acreditados`.
-The web client at commit `7628a29` can transport the new calls but has no evaluation or
-rating UI yet. Frontend integration is separate from this backend task block.
+The web client at commit `eb73b00` consumes the OpenAPI 1.6.0 evaluation, rating, and
+owner-history response shapes, with frontend tests covering persistence and privacy.
 
 ## Convergence verification (2026-10-29)
 

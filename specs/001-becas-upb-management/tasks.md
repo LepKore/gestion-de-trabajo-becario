@@ -68,7 +68,7 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 
 ### Implementation for User Story 1
 
-- [X] T013 [US1] Implement the SQL rating aggregation in `src/services/jobs.js` using `CERRADO` jobs with confirmed attendance and the documented last-10 algorithm
+- [X] T013 [US1] Implement the deterministic last-10 rating selection in `src/services/jobs.js` using parameterized queries for `CERRADO` jobs with confirmed attendance, then average available evaluations in the service layer per the documented algorithm
 - [X] T014 [US1] Implement `GET /me/rating` in `src/routes/jobs.js` with becario ownership authorization and the contract response from `openapi.yaml`
 - [X] T015 [US1] Preserve the existing `GET /me/applications` response shape in `src/routes/jobs.js` and `src/services/jobs.js` unless the canonical contract adds an explicit additive field
 
@@ -194,3 +194,16 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 - [X] T043 [P] Execute the evaluation and rating scenarios in `quickstart.md`, record pass/fail evidence, and update `docs/AI_CONTEXT.md` with the implemented evaluation module status, per T032–T033 (missing).
 
 - [X] T044 [US2] Return each attendance row's `evaluation: Evaluacion | null` from owner-only closed-job attendance and owner history, preserve student/admin response privacy, and cover persistence plus contract shape in `src/services/control.js`, `test/control.test.js`, and `test/contracts/evaluations.test.js`.
+
+## Phase 8: Convergence
+
+- [X] T045 [US1] Confirm consumption in `gestion-de-trabajo-becario-web` of OpenAPI 1.6.0 for `/me/rating` and `/applications/{id}/evaluation`; record revision, date, reviewer, and unresolved issues in `plan.md`.
+- [X] T046 [US1] Align `getRating` with the documented deterministic selection and service-layer averaging decision; no SQL rewrite is required.
+- [X] T047 [P] Reconcile convergence evidence and historical `(missing)`/`(partial)` labels and references across `tasks.md`, `quickstart.md`, and `plan.md`.
+
+## Phase 9: Convergence
+
+- [X] T048 [US1] Duplicate confirmation superseded by T045; frontend consumption is recorded against OpenAPI 1.6.0 and frontend commit `eb73b00`.
+- [X] T049 [US1] Duplicate SQL-decision task superseded by T046; the service-layer implementation is documented and approved.
+- [X] T050 [P] Duplicate reconciliation task superseded by T047; convergence evidence and current OpenAPI references are reconciled.
+- [X] T051 [P] Update the Constitution Check and quality-gate evidence in `plan.md` to reflect the executed test-first, build, lint, integration, contract, and audit validations per Constitution III–IV.

@@ -113,9 +113,9 @@ The FR-007 rating algorithm MUST:
 ### Measurable Outcomes
 
 - **SC-001**: In a local test dataset containing at least 100 jobs and 1,000 applications, the job-listing and progress endpoints MUST complete within 2 seconds at p95 across 20 authenticated requests.
-- **SC-002**: Encargados can successfully evaluate a becario across all 4 criteria in under 30 seconds, and the API request responds within 500 ms at p95 under the local integration-test dataset.
+- **SC-002**: In the local integration-test dataset, the encargado evaluation interaction can be completed by a user in under 30 seconds, while the evaluation API request responds within 500 ms at p95. These are separate measures: the first is observed interaction time and the second is server/API latency.
 - **SC-003**: Average ratings correctly reflect available evaluations among the last 10 trabajos realizados, with the required message when fewer than 10 exist.
-- **SC-004**: Administrators can generate a complete institutional hour compliance report in a single view.
+- **SC-004**: Administrators can generate the complete institutional hour compliance result for the requested filters through one `/students/compliance` response. The response includes every matching becario and the fields `id`, `name`, `email`, `code`, `career`, `semester`, `targetMinutes`, `accreditedMinutes`, `remainingMinutes`, `excessMinutes`, and `completed`; this feature does not introduce pagination or a second request to assemble the result.
 - **SC-005**: 100% of credited scholarship hours are traceable to validated attendance closure and job assignment; evaluations do not participate in accreditation.
 
 ## Assumptions
