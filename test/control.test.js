@@ -92,6 +92,10 @@ it('valida lista exhaustiva, registra ausencias y rechaza pendientes en un solo 
   assert.equal(ownerHistory.body.data[0].attendance.length, 2)
   const detail = await owner.get(`/api/v1/jobs/${jobId}/attendance`)
   assert.deepEqual(Object.keys(detail.body.data[0].student).sort(), ['career', 'code', 'name'])
+  assert.ok(detail.body.data.every(row => row.evaluation === null))
+  const closedJob = ownerHistory.body.data.find(row => row.job.id === jobId)
+  assert.ok(closedJob)
+  assert.ok(closedJob.attendance.every(row => row.evaluation === null))
 })
 
 it('reintento con clave y contenido equivalentes conserva respuesta y horas; otras claves dan conflicto', async () => {
@@ -182,6 +186,18 @@ it('aplica rol, propiedad, CSRF y validacion de clave a las nuevas rutas', async
   assert.match(preflight.headers.get('access-control-allow-headers'), /Idempotency-Key/)
 })
 
+it('la asistencia es la única fuente de minutos acreditados y queda registrada por aplicación', async () => {
+  const jobId = await createJob(60)
+  const applicationId = await apply(first, jobId, true)
+  const before = (await first.get('/api/v1/me/progress')).body.data.accreditedMinutes
+  await finish(jobId)
+  assert.equal((await close(jobId, [{ applicationId, attended: true }])).status, 200)
+  const attendance = await ctx.pool.query('SELECT asistio,minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
+  assert.deepEqual(attendance.rows[0], { asistio: true, minutos_acreditados: 60 })
+  assert.equal((await first.get('/api/v1/me/progress')).body.data.accreditedMinutes - before, 60)
+  assert.equal((await ctx.pool.query('SELECT count(*)::int AS n FROM evaluaciones WHERE postulacion_id=$1', [applicationId])).rows[0].n, 0)
+})
+
 it('ADMIN filtra el progreso de estudiantes y consulta su historial; otros roles quedan excluidos', async () => {
   const pendingSuffix = `pending-progress-${++counter}`
   const completeSuffix = `complete-progress-${++counter}`
@@ -238,4 +254,96 @@ it('el resumen del encargado agrega únicamente sus trabajos y estados', async (
   assert.equal((await other.get('/api/v1/me/dashboard')).body.data.totalJobs, 0)
   assert.equal((await admin.get('/api/v1/me/dashboard')).status, 403)
   assert.equal((await first.get('/api/v1/me/dashboard')).status, 403)
+})
+
+it('la evaluación no modifica horas acreditadas ni progreso', async () => {
+  const jobId = await createJob(60, 1)
+  const applicationId = await apply(first, jobId, true)
+  await finish(jobId)
+  assert.equal((await close(jobId, [{ applicationId, attended: true }])).status, 200)
+
+  const before = (await first.get('/api/v1/me/progress')).body.data
+  const evaluation = await owner.post(`/api/v1/applications/${applicationId}/evaluation`, {
+    responsabilidad: 5, puntualidad: 4, proactividad: 5, comunicacion: 4,
+  })
+  assert.equal(evaluation.status, 201, JSON.stringify(evaluation.body))
+  assert.equal(evaluation.body.data.promedio, 4.5)
+
+  const after = (await first.get('/api/v1/me/progress')).body.data
+  assert.deepEqual(after, before)
+  const stored = await ctx.pool.query('SELECT minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
+  assert.equal(stored.rows[0].minutos_acreditados, 60)
+  const ownerDetail = await owner.get(`/api/v1/jobs/${jobId}/attendance`)
+  const saved = ownerDetail.body.data.find(row => row.applicationId === applicationId).evaluation
+  assert.equal(saved.promedio, 4.5)
+  assert.deepEqual(
+    Object.keys(saved).sort(),
+    ['comunicacion', 'creadoEn', 'id', 'postulacionId', 'proactividad', 'promedio', 'puntualidad', 'responsabilidad'],
+  )
+  const ownerHistory = await owner.get('/api/v1/me/history')
+  const historyRow = ownerHistory.body.data.flatMap(row => row.attendance).find(row => row.applicationId === applicationId)
+  assert.equal(historyRow.evaluation.promedio, 4.5)
+
+  for (const result of [
+    await first.get('/api/v1/me/progress'),
+    await first.get('/api/v1/me/history'),
+    await admin.get(`/api/v1/students/${first.id}/history`),
+    await admin.get('/api/v1/students/compliance'),
+    await admin.get('/api/v1/students/progress'),
+  ]) {
+    assert.equal(result.status, 200)
+    assert.doesNotMatch(JSON.stringify(result.body), /"(?:evaluation|promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
+  }
+})
+
+it('makes every credited minute traceable to an accepted application, attendance, and closed job', async () => {
+  const jobId = await createJob(120, 2)
+  const attendedId = await apply(first, jobId, true)
+  const absentId = await apply(second, jobId, true)
+  const creditedBefore = (await first.get('/api/v1/me/progress')).body.data.accreditedMinutes
+  await finish(jobId)
+  assert.equal((await close(jobId, [
+    { applicationId: attendedId, attended: true },
+    { applicationId: absentId, attended: false },
+  ])).status, 200)
+
+  const trace = async () => (await ctx.pool.query(`
+    SELECT a.postulacion_id, a.trabajo_id, p.trabajo_id AS postulacion_trabajo_id,
+      a.asistio, a.minutos_acreditados,
+      p.estado AS estado_postulacion, t.estado AS estado_trabajo,
+      t.duracion_minutos, c.trabajo_id AS trabajo_cerrado_id,
+      e.postulacion_id AS evaluacion_postulacion_id
+    FROM asistencias a
+    JOIN postulaciones p ON p.id=a.postulacion_id
+    JOIN trabajos t ON t.id=a.trabajo_id
+    JOIN cierres c ON c.trabajo_id=t.id
+    LEFT JOIN evaluaciones e ON e.postulacion_id=p.id
+    WHERE a.trabajo_id=$1
+    ORDER BY a.postulacion_id`, [jobId])).rows
+
+  const beforeEvaluation = await trace()
+  assert.equal(beforeEvaluation.length, 2)
+  assert.equal(new Set(beforeEvaluation.map(row => row.postulacion_id)).size, 2)
+  for (const row of beforeEvaluation) {
+    assert.equal(row.trabajo_id, jobId)
+    assert.equal(row.postulacion_trabajo_id, jobId)
+    assert.equal(row.trabajo_cerrado_id, jobId)
+    assert.equal(row.estado_postulacion, 'ACEPTADA')
+    assert.equal(row.estado_trabajo, 'CERRADO')
+    assert.equal(row.minutos_acreditados, row.asistio ? row.duracion_minutos : 0)
+  }
+  assert.equal(beforeEvaluation.reduce((total, row) => total + row.minutos_acreditados, 0), 120)
+  assert.equal((await ctx.pool.query('SELECT count(*)::int AS n FROM evaluaciones WHERE postulacion_id=ANY($1::uuid[])', [[attendedId, absentId]])).rows[0].n, 0)
+
+  assert.equal((await owner.post(`/api/v1/applications/${attendedId}/evaluation`, {
+    responsabilidad: 5, puntualidad: 4, proactividad: 5, comunicacion: 4,
+  })).status, 201)
+  const progressAfterClosure = (await first.get('/api/v1/me/progress')).body.data
+  assert.equal(progressAfterClosure.accreditedMinutes, creditedBefore + 120)
+  const afterEvaluation = await trace()
+  assert.deepEqual(afterEvaluation.map(({ evaluacion_postulacion_id: _evaluation, ...row }) => row),
+    beforeEvaluation.map(({ evaluacion_postulacion_id: _evaluation, ...row }) => row))
+  assert.equal(afterEvaluation.find(row => row.postulacion_id === attendedId).evaluacion_postulacion_id, attendedId)
+  assert.equal(afterEvaluation.reduce((total, row) => total + row.minutos_acreditados, 0), 120)
+  assert.deepEqual((await first.get('/api/v1/me/progress')).body.data, progressAfterClosure)
 })

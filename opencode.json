@@ -23,7 +23,10 @@
         "POSTMAN_API_KEY": "{env:POSTMAN_API_KEY}"
       },
       "enabled": true,
-      "timeout": 60000
+      // 120000, no 60000: medido 2026-10-23, el arranque tarda ~65 s en cargar
+      // sus 243 archivos de tools. Con 60 s opencode abortaba por "Request
+      // timed out" antes de completar el handshake.
+      "timeout": 120000
     }
   }
 }

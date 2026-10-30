@@ -1,4 +1,4 @@
-import { badRequest, conflict, forbidden, fromDatabaseError, notFound } from '../lib/errors.js'
+import { badRequest, conflict, evaluationConflict, forbidden, fromDatabaseError, notFound } from '../lib/errors.js'
 
 const selectJob = `SELECT t.*, u.nombre AS encargado_nombre,
   (SELECT count(*)::int FROM postulaciones p WHERE p.trabajo_id=t.id AND p.estado='ACEPTADA') AS aceptados
@@ -43,7 +43,7 @@ async function activeUsers(client, ids, actorId) {
   }
 }
 async function lockJob(client, id) {
-  const { rows } = await client.query('SELECT * FROM trabajos WHERE id=$1 FOR UPDATE', [id])
+  const { rows } = await client.query('SELECT id,encargado_id,titulo,estado,inicio_previsto,duracion_minutos,cupos FROM trabajos WHERE id=$1 FOR UPDATE', [id])
   if (!rows[0]) throw notFound('Trabajo no encontrado.')
   return rows[0]
 }
@@ -116,13 +116,13 @@ export async function decideApplication(pool, id, actorId, state) {
     if (!lookup.rows[0]) throw notFound('Postulación no encontrada.')
     const job = await lockJob(client, lookup.rows[0].trabajo_id)
     ownerOnly(job, actorId)
-    const { rows } = await client.query('SELECT * FROM postulaciones WHERE id=$1 FOR UPDATE', [id])
+    const { rows } = await client.query('SELECT id,trabajo_id,estudiante_id,estado,creado_en,actualizado_en FROM postulaciones WHERE id=$1 FOR UPDATE', [id])
     const application = rows[0]
     await activeUsers(client, state === 'ACEPTADA' ? [actorId, application.estudiante_id] : [actorId], actorId)
     await notStarted(client, job)
     if (application.estado !== 'PENDIENTE') throw conflict('postulacion_resuelta', 'La decisión de esta postulación ya fue registrada.')
     if (state === 'ACEPTADA') await available(client, job)
-    const updated = await client.query('UPDATE postulaciones SET estado=$2,actualizado_en=clock_timestamp() WHERE id=$1 RETURNING *', [id,state])
+    const updated = await client.query('UPDATE postulaciones SET estado=$2,actualizado_en=clock_timestamp() WHERE id=$1 RETURNING id,trabajo_id,estudiante_id,estado,creado_en,actualizado_en', [id,state])
     return applicationView(updated.rows[0])
   })
 }
@@ -135,7 +135,9 @@ export async function listApplications(pool, filters, { jobId = null, actorId })
   const where = 'WHERE ($1::uuid IS NULL OR p.trabajo_id=$1) AND ($2::uuid IS NULL OR p.estudiante_id=$2) AND ($3::text IS NULL OR p.estado=$3)'
   const values = [jobId, jobId ? null : actorId, filters.estado ?? null]
   const count = await pool.query(`SELECT count(*)::int AS total FROM postulaciones p ${where}`, values)
-  const { rows } = await pool.query(`SELECT p.*,u.nombre,e.codigo,e.carrera FROM postulaciones p JOIN estudiantes e ON e.usuario_id=p.estudiante_id JOIN usuarios u ON u.id=p.estudiante_id ${where} ORDER BY p.creado_en,p.id LIMIT $4 OFFSET $5`, [...values,filters.pageSize,(filters.page-1)*filters.pageSize])
+  const { rows } = await pool.query(`SELECT p.*,u.nombre,e.codigo,e.carrera,e.semestre,e.meta_minutos,
+    (SELECT COALESCE(sum(a.minutos_acreditados),0)::bigint FROM postulaciones previa LEFT JOIN asistencias a ON a.postulacion_id=previa.id WHERE previa.estudiante_id=p.estudiante_id) AS acreditados
+    FROM postulaciones p JOIN estudiantes e ON e.usuario_id=p.estudiante_id JOIN usuarios u ON u.id=p.estudiante_id ${where} ORDER BY p.creado_en,p.id LIMIT $4 OFFSET $5`, [...values,filters.pageSize,(filters.page-1)*filters.pageSize])
   // Fetch the page's jobs in one query rather than one query per application.
   const jobs = new Map()
   if (!jobId && rows.length) {
@@ -145,8 +147,49 @@ export async function listApplications(pool, filters, { jobId = null, actorId })
   const data = rows.map(row => ({
     ...applicationView(row),
     ...(jobId
-      ? { estudiante: { nombre: row.nombre, codigo: row.codigo, carrera: row.carrera } }
+      ? { estudiante: { nombre: row.nombre, codigo: row.codigo, carrera: row.carrera, semester: row.semestre, targetMinutes: row.meta_minutos, accreditedMinutes: Number(row.acreditados), remainingMinutes: Math.max(row.meta_minutos - Number(row.acreditados), 0) } }
       : { trabajo: jobs.get(row.trabajo_id) }),
   }))
   return pageResult(data, count.rows[0].total, filters)
+}
+
+export function selectLastRealized(rows, limit = 10) {
+  return [...rows].sort((a, b) => Number(new Date(b.cerrado_en)) - Number(new Date(a.cerrado_en)) || String(a.postulacion_id).localeCompare(String(b.postulacion_id))).slice(0, limit)
+}
+
+export function averageEvaluations(rows) {
+  const values = rows.map(row => row.promedio).filter(value => value !== null && value !== undefined).map(Number)
+  return values.length ? Number((values.reduce((sum, value) => sum + value, 0) / values.length).toFixed(2)) : null
+}
+
+export async function getRating(pool, studentId) {
+  const { rows } = await pool.query(`SELECT p.id AS postulacion_id, c.cerrado_en, e.promedio
+    FROM postulaciones p JOIN trabajos t ON t.id=p.trabajo_id
+    JOIN cierres c ON c.trabajo_id=t.id JOIN asistencias a ON a.postulacion_id=p.id
+    LEFT JOIN evaluaciones e ON e.postulacion_id=p.id
+    WHERE p.estudiante_id=$1 AND t.estado='CERRADO' AND a.asistio=true`, [studentId])
+  const realized = selectLastRealized(rows)
+  return { rating: realized.length < 10 ? null : averageEvaluations(realized), trabajosRealizados: realized.length, evaluacionesConsideradas: realized.filter(row => row.promedio !== null).length, message: realized.length < 10 ? 'faltan realizar trabajos' : null }
+}
+
+export async function createEvaluation(pool, applicationId, data, evaluatorId) {
+  return transaction(pool, async client => {
+    const { rows } = await client.query(`SELECT p.id,p.estado,p.estudiante_id,t.estado AS trabajo_estado,t.encargado_id,
+      a.asistio FROM postulaciones p JOIN trabajos t ON t.id=p.trabajo_id
+      LEFT JOIN asistencias a ON a.postulacion_id=p.id WHERE p.id=$1 FOR UPDATE OF p,t`, [applicationId])
+    const application = rows[0]
+    if (!application) throw notFound('Postulación no encontrada.')
+    if (application.encargado_id !== evaluatorId) throw forbidden('Solo el encargado propietario puede evaluar.')
+    if (application.trabajo_estado !== 'CERRADO' || application.estado !== 'ACEPTADA' || application.asistio !== true) throw conflict('evaluacion_no_disponible', 'La evaluación requiere trabajo cerrado y asistencia confirmada.')
+    try {
+      const result = await client.query(`INSERT INTO evaluaciones(postulacion_id,evaluador_id,responsabilidad,puntualidad,proactividad,comunicacion)
+        VALUES($1,$2,$3,$4,$5,$6) RETURNING id,postulacion_id,responsabilidad,puntualidad,proactividad,comunicacion,promedio,creado_en`,
+      [applicationId, evaluatorId, data.responsabilidad, data.puntualidad, data.proactividad, data.comunicacion])
+      const row = result.rows[0]
+      return { id: row.id, postulacionId: row.postulacion_id, responsabilidad: row.responsabilidad, puntualidad: row.puntualidad, proactividad: row.proactividad, comunicacion: row.comunicacion, promedio: Number(row.promedio), creadoEn: row.creado_en }
+    } catch (error) {
+      if (error?.code === '23505') throw evaluationConflict()
+      throw error
+    }
+  })
 }

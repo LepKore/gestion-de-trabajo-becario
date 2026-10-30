@@ -3,7 +3,7 @@ import { parse, usuarioIdSchema } from '../lib/validation.js'
 import { closeSchema, historyQuerySchema, idempotencyKeySchema, studentProgressQuerySchema } from '../lib/control-validation.js'
 import { requireSession, requireRole, requireCsrf, requireNoPendingPasswordChange } from '../middleware/auth.js'
 import { closeJob, getProgress, getStudentHistory, getStudentHistoryForAdmin, getOwnerHistory, getJobAttendance, getOwnerDashboard } from '../services/control.js'
-import { listStudentProgress } from '../services/student-progress.js'
+import { listStudentProgress, listStudentCompliance } from '../services/student-progress.js'
 
 export function controlRouter({ config }) {
   const router = Router()
@@ -39,6 +39,9 @@ export function controlRouter({ config }) {
       : await getOwnerHistory(pool, req.usuario.id, filters))
   }))
 
+  router.get('/students/compliance', ...auth, admin, handle(async (req, res, pool) => {
+    res.json({ data: await listStudentCompliance(pool) })
+  }))
   router.get('/students/progress', ...auth, admin, handle(async (req, res, pool) => {
     const filters = parse(studentProgressQuerySchema, req.query)
     res.json(await listStudentProgress(pool, filters))

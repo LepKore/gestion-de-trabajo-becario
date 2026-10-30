@@ -1,5 +1,6 @@
 # MiBeca: instrucciones para agentes del backend
 
+- Al iniciar cualquier tarea, carga primero la skill `mibeca-sdd-router` (`.agents/skills/mibeca-sdd-router/SKILL.md`): ella decide qué skills del proyecto o globales aplican. Si ninguna aplica, implementa sin skills y termina anunciando que no se usaron.
 - El coordinador asigna archivos y evita ediciones simultáneas sobre ellos. Un subagente recibe una tarea acotada y entrega resultados verificables; las decisiones persistentes se registran en documentación versionada.
 - Lee `docs/PLAN_MVP_MIBECA.md` y `docs/AI_CONTEXT.md` al comenzar. El contrato futuro será `openapi.yaml`; hasta que exista, `docs/api-v1.md` es borrador y se subordina al plan. Si trabajas con frontend, indica la revisión del contrato usada.
 - Este repositorio contiene la API y PostgreSQL local. El frontend y su configuración Firebase pertenecen al otro repositorio.

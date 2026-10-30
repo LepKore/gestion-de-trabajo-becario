@@ -1,6 +1,6 @@
 # MiBeca API v1 — resumen subordinado al contrato
 
-**Estado (19-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control y Supervisión están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.3.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
+**Estado (30-10-2026): Auth, Usuarios, Trabajos, Postulaciones, Control, Supervisión y evaluación backend están implementados.** El contrato canónico es [`../openapi.yaml`](../openapi.yaml), revisión 1.6.0; este documento es un resumen legible y **no** es la fuente de verdad técnica: esquemas, validaciones, ejemplos y códigos de error se toman de `openapi.yaml`. [PLAN_MVP_MIBECA.md](PLAN_MVP_MIBECA.md) define el alcance v1; la spec `001-becas-upb-management` concreta la evaluación. El frontend debe indicar la revisión del contrato backend que utilice y no debe mantener una copia alternativa del contrato.
 
 ## Convenciones acordadas
 
@@ -22,12 +22,14 @@ Todas reciben el prefijo `/api/v1`. La columna «Estado» distingue lo implement
 | Usuarios | `POST /users/{id}/deactivate`, `POST /users/{id}/reactivate`, `POST /users/{id}/reset-password` | Solo administrador; desactivación y reset revocan sesiones. | Implementado |
 | Trabajos | `GET /jobs`, `POST /jobs`, `GET /jobs/{id}`, `PATCH /jobs/{id}` | Lectura según rol; creación y edición solo por encargado propietario antes del inicio y de cualquier aceptación. | Implementado |
 | Control | `POST /jobs/{id}/close`, `GET /jobs/{id}/attendance` | Propietario; cierre único desde fin previsto y consulta posterior de asistencia. | Implementado |
-| Postulaciones | `POST /jobs/{id}/applications`, `GET /jobs/{id}/applications` | Postulación propia de becario; listado del encargado propietario. | Implementado |
+| Postulaciones | `POST /jobs/{id}/applications`, `GET /jobs/{id}/applications` | Postulación propia de becario; listado del encargado propietario con semestre y progreso de beca del estudiante. | Implementado |
 | Postulaciones | `POST /applications/{id}/accept`, `POST /applications/{id}/reject` | Encargado propietario antes del inicio; aceptación con control transaccional de cupo. | Implementado |
 | Consultas propias | `GET /me/applications`, `GET /me/jobs` | Según rol y propiedad. | Implementado |
 | Control propio | `GET /me/progress`, `GET /me/history` | Según rol y propiedad; progreso solo de becario. | Implementado |
 | Resumen encargado | `GET /me/dashboard` | Solo encargado; agrega únicamente sus trabajos. | Implementado |
 | Supervisión | `GET /students/progress`, `GET /students/{id}/history` | Solo administrador. | Implementado |
+| Evaluaciones | `POST /applications/{id}/evaluation`, `GET /me/rating` | El propietario evalúa una asistencia confirmada tras el cierre; el becario ve su promedio agregado. | Implementado en backend; integración frontend pendiente |
+| Cumplimiento | `GET /students/compliance` | Solo administrador; lista completa de horas y estado de cumplimiento en una respuesta, sin calificaciones. | Implementado en backend |
 
 El cierre recibe una lista exhaustiva de `{applicationId, attended}` para todos los aceptados y la cabecera `Idempotency-Key`. El servidor toma los minutos del trabajo; el cliente no decide horas acreditadas. Los ausentes reciben cero y permanecen en el historial. Las postulaciones pendientes se rechazan con `motivo_rechazo=CIERRE_TRABAJO`. La misma clave y contenido devuelve el resultado original, mientras una clave reutilizada con contenido distinto o un cierre nuevo devuelven 409. No hay retiro de postulaciones, jornadas parciales, `completionId`, ruta de acreditación individual ni edición posterior de horas en el MVP.
 

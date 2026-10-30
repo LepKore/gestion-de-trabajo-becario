@@ -1,0 +1,15 @@
+hooks:
+  before_implement:
+    - extension: spec-kit-analysis
+      command: speckit.analyze
+      description: Review specification, plan, tasks, coverage, and constitutional alignment before implementation.
+      prompt: Run the read-only Spec Kit consistency analysis before implementation.
+      optional: true
+      enabled: true
+  after_implement:
+    - extension: spec-kit-analysis
+      command: speckit.analyze
+      description: Recheck specification, plan, tasks, coverage, and constitutional alignment after implementation.
+      prompt: Run the read-only Spec Kit consistency analysis after implementation.
+      optional: true
+      enabled: true

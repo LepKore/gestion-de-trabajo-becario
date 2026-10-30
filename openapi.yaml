@@ -1,7 +1,7 @@
 openapi: 3.1.0
 info:
   title: MiBeca API
-  version: 1.3.0
+  version: 1.6.0
   description: >-
     Contrato canónico de MiBeca. Esta revisión cubre Auth, Usuarios, Trabajos,
     Postulaciones, Control y supervisión administrativa básica (fases 2 a 5).
@@ -605,7 +605,7 @@ paths:
         - "Postulaciones"
       operationId: "listarPostulantes"
       summary: "Lista postulantes del trabajo propio"
-      description: "Solo ENCARGADO propietario. Datos del estudiante limitados a nombre, código y carrera. Otros roles o propietario ajeno reciben 403."
+      description: "Solo ENCARGADO propietario. Devuelve nombre, código, carrera, semestre y progreso de beca del estudiante (minutos de meta, acreditados y restantes). Otros roles o propietario ajeno reciben 403."
       security:
         -
           cookieAuth: []
@@ -922,6 +922,58 @@ paths:
           $ref: "#/components/responses/ErrorNoEncontrado"
         409:
           $ref: "#/components/responses/ErrorConflicto"
+  /me/rating:
+    get:
+      tags: ["Evaluaciones"]
+      operationId: "consultarMiRating"
+      summary: "Consulta la calificación del becario autenticado"
+      description: "Solo BECARIO autenticado. Selecciona los últimos 10 trabajos realizados (cerrados con asistencia confirmada) y promedia solo las evaluaciones disponibles."
+      security:
+        - cookieAuth: []
+      responses:
+        200:
+          description: "Calificación agregada"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/RatingBecario' }
+        401: { $ref: '#/components/responses/ErrorNoAutorizado' }
+        403: { $ref: '#/components/responses/ErrorProhibido' }
+  /applications/{id}/evaluation:
+    parameters:
+      - $ref: '#/components/parameters/UsuarioId'
+    post:
+      tags: ["Evaluaciones"]
+      operationId: "crearEvaluacion"
+      summary: "Registra una evaluación inmutable"
+      description: "Solo ENCARGADO propietario de un trabajo CERRADO con postulación ACEPTADA y asistencia confirmada. La evaluación no modifica horas."
+      security:
+        - cookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/CsrfToken'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvaluacionInput' }
+      responses:
+        201:
+          description: "Evaluación creada"
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data: { $ref: '#/components/schemas/Evaluacion' }
+        400: { $ref: '#/components/responses/ErrorValidacion' }
+        401: { $ref: '#/components/responses/ErrorNoAutorizado' }
+        403: { $ref: '#/components/responses/ErrorProhibido' }
+        404: { $ref: '#/components/responses/ErrorNoEncontrado' }
+        409: { $ref: '#/components/responses/ErrorConflicto' }
 
   /jobs/{id}/close:
     parameters:
@@ -970,7 +1022,7 @@ paths:
       tags: [Control]
       operationId: consultarAsistenciaTrabajo
       summary: Consulta asistencia de un trabajo propio cerrado
-      description: Solo ENCARGADO propietario. Devuelve datos básicos del estudiante.
+      description: Solo ENCARGADO propietario. Devuelve asistencia y evaluación persistida cuando exista; ADMIN no puede usar esta ruta.
       security: [{ cookieAuth: [] }]
       responses:
         '200':
@@ -1038,8 +1090,7 @@ paths:
       description: >-
         BECARIO recibe todas sus postulaciones, incluidas abiertas y ausencias;
         attended es null si no se registró asistencia para esa postulación.
-        ENCARGADO recibe solo trabajos propios
-        cerrados y sus asistencias. Orden estable por fecha e ID.
+        ENCARGADO recibe solo trabajos propios cerrados, sus asistencias y la evaluación persistida de cada postulante cuando exista. BECARIO recibe únicamente su historial propio; ADMIN no recibe evaluaciones en las rutas administrativas. Orden estable por fecha e ID.
       security: [{ cookieAuth: [] }]
       parameters:
         - $ref: '#/components/parameters/Page'
@@ -1054,6 +1105,22 @@ paths:
                   - $ref: '#/components/schemas/HistorialBecario'
                   - $ref: '#/components/schemas/HistorialEncargado'
         '400': { $ref: '#/components/responses/ErrorValidacion' }
+        '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
+        '403': { $ref: '#/components/responses/ErrorProhibido' }
+
+  /students/compliance:
+    get:
+      tags: [Control]
+      operationId: consultarCumplimientoEstudiantes
+      summary: Consulta el cumplimiento de horas de todos los becarios en una respuesta
+      description: Solo ADMIN. Incluye estudiantes activos e inactivos; las horas provienen de asistencia, nunca de evaluaciones.
+      security: [{ cookieAuth: [] }]
+      responses:
+        '200':
+          description: Cumplimiento institucional completo
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CumplimientoEstudiantes' }
         '401': { $ref: '#/components/responses/ErrorNoAutorizado' }
         '403': { $ref: '#/components/responses/ErrorProhibido' }
 
@@ -1173,6 +1240,33 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
 
   schemas:
+    EvaluacionInput:
+      type: object
+      additionalProperties: false
+      required: [responsabilidad, puntualidad, proactividad, comunicacion]
+      properties:
+        responsabilidad: { type: integer, minimum: 1, maximum: 5 }
+        puntualidad: { type: integer, minimum: 1, maximum: 5 }
+        proactividad: { type: integer, minimum: 1, maximum: 5 }
+        comunicacion: { type: integer, minimum: 1, maximum: 5 }
+    Evaluacion:
+      allOf:
+        - $ref: '#/components/schemas/EvaluacionInput'
+        - type: object
+          required: [id, postulacionId, promedio, creadoEn]
+          properties:
+            id: { type: string, format: uuid }
+            postulacionId: { type: string, format: uuid }
+            promedio: { type: number, minimum: 1, maximum: 5 }
+            creadoEn: { type: string, format: date-time }
+    RatingBecario:
+      type: object
+      required: [rating, trabajosRealizados, evaluacionesConsideradas, message]
+      properties:
+        rating: { type: [number, 'null'], minimum: 1, maximum: 5 }
+        trabajosRealizados: { type: integer, minimum: 0 }
+        evaluacionesConsideradas: { type: integer, minimum: 0 }
+        message: { type: [string, 'null'], enum: ['faltan realizar trabajos', null] }
     TrabajoInput:
       type: "object"
       additionalProperties: false
@@ -1391,6 +1485,22 @@ components:
                   pattern: "^[0-9]{5}$"
                 carrera:
                   type: "string"
+                semester:
+                  type: "integer"
+                  minimum: 1
+                  maximum: 12
+                targetMinutes:
+                  type: "integer"
+                  minimum: 6
+                  multipleOf: 6
+                accreditedMinutes:
+                  type: "integer"
+                  minimum: 0
+                  multipleOf: 6
+                remainingMinutes:
+                  type: "integer"
+                  minimum: 0
+                  multipleOf: 6
     PostulacionConTrabajo:
       allOf:
         -
@@ -1428,7 +1538,7 @@ components:
       allOf:
         - $ref: '#/components/schemas/Asistencia'
         - type: object
-          required: [student]
+          required: [student, evaluation]
           properties:
             student:
               type: object
@@ -1438,6 +1548,10 @@ components:
                 name: { type: string }
                 code: { type: string, pattern: '^[0-9]{5}$' }
                 career: { type: string }
+            evaluation:
+              anyOf:
+                - $ref: '#/components/schemas/Evaluacion'
+                - type: 'null'
     Cierre:
       type: object
       additionalProperties: false
@@ -1457,6 +1571,25 @@ components:
         accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
         excessMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+    CumplimientoEstudiantes:
+      type: object
+      additionalProperties: false
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            type: object
+            additionalProperties: false
+            required: [id, name, code, targetMinutes, accreditedMinutes, remainingMinutes, completed]
+            properties:
+              id: { type: string, format: uuid }
+              name: { type: string }
+              code: { type: string, pattern: '^[0-9]{5}$' }
+              targetMinutes: { type: integer, minimum: 6, multipleOf: 6 }
+              accreditedMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              remainingMinutes: { type: integer, minimum: 0, multipleOf: 6 }
+              completed: { type: boolean }
     ProgresoEstudiantes:
       type: object
       additionalProperties: false

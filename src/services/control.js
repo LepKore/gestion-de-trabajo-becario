@@ -35,7 +35,7 @@ function assertOwner(job, actorId) {
 }
 
 async function getOwnedJob(pool, jobId, actorId, forUpdate = false) {
-  const { rows } = await pool.query(`SELECT * FROM trabajos WHERE id=$1${forUpdate ? ' FOR UPDATE' : ''}`, [jobId])
+  const { rows } = await pool.query(`SELECT id,encargado_id,titulo,estado,fin_previsto,duracion_minutos${forUpdate ? ' FROM trabajos WHERE id=$1 FOR UPDATE' : ' FROM trabajos WHERE id=$1'}`, [jobId])
   if (!rows[0]) throw notFound('Trabajo no encontrado.')
   assertOwner(rows[0], actorId)
   return rows[0]
@@ -147,11 +147,14 @@ export async function getStudentHistoryForAdmin(pool, studentId, filters) {
 async function getAttendanceForJobs(pool, ids) {
   if (ids.length === 0) return new Map()
   const { rows } = await pool.query(`SELECT a.trabajo_id,a.postulacion_id,a.asistio,a.minutos_acreditados,
-      u.nombre,e.codigo,e.carrera
+      u.nombre,e.codigo,e.carrera,
+      ev.id AS evaluacion_id,ev.postulacion_id AS evaluacion_postulacion_id,
+      ev.responsabilidad,ev.puntualidad,ev.proactividad,ev.comunicacion,ev.promedio,ev.creado_en AS evaluacion_creado_en
     FROM asistencias a
     JOIN postulaciones p ON p.id=a.postulacion_id
     JOIN estudiantes e ON e.usuario_id=p.estudiante_id
     JOIN usuarios u ON u.id=e.usuario_id
+    LEFT JOIN evaluaciones ev ON ev.postulacion_id=p.id
     WHERE a.trabajo_id=ANY($1::uuid[]) ORDER BY a.trabajo_id,a.postulacion_id`, [ids])
   const byJob = new Map(ids.map(id => [id, []]))
   for (const row of rows) {
@@ -159,6 +162,12 @@ async function getAttendanceForJobs(pool, ids) {
       applicationId: row.postulacion_id, attended: row.asistio,
       awardedMinutes: row.minutos_acreditados,
       student: { name: row.nombre, code: row.codigo, career: row.carrera },
+      evaluation: row.evaluacion_id ? {
+        id: row.evaluacion_id, postulacionId: row.evaluacion_postulacion_id,
+        responsabilidad: row.responsabilidad, puntualidad: row.puntualidad,
+        proactividad: row.proactividad, comunicacion: row.comunicacion,
+        promedio: Number(row.promedio), creadoEn: row.evaluacion_creado_en,
+      } : null,
     })
   }
   return byJob

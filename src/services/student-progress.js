@@ -17,7 +17,7 @@ export async function listStudentProgress(pool, filters) {
 
   const total = await pool.query(`WITH resumen AS (${resumen}) SELECT count(*)::int AS total FROM resumen ${where}`, values)
   const totalFilas = total.rows[0].total
-  const { rows } = await pool.query(`WITH resumen AS (${resumen}) SELECT * FROM resumen ${where}
+  const { rows } = await pool.query(`WITH resumen AS (${resumen}) SELECT id,nombre,correo,codigo,carrera,semestre,meta_minutos,acreditados FROM resumen ${where}
     ORDER BY lower(nombre),codigo,id LIMIT $3 OFFSET $4`,
   [...values, filters.pageSize, (filters.page - 1) * filters.pageSize])
 
@@ -34,4 +34,23 @@ export async function listStudentProgress(pool, filters) {
     }),
     meta: { page: filters.page, pageSize: filters.pageSize, total: totalFilas, totalPages: Math.ceil(totalFilas / filters.pageSize) },
   }
+}
+
+export async function listStudentCompliance(pool) {
+  const { rows } = await pool.query(`SELECT u.id,u.nombre,e.codigo,e.meta_minutos,
+      COALESCE(sum(a.minutos_acreditados),0)::bigint AS acreditados
+    FROM estudiantes e JOIN usuarios u ON u.id=e.usuario_id
+    LEFT JOIN postulaciones p ON p.estudiante_id=e.usuario_id
+    LEFT JOIN asistencias a ON a.postulacion_id=p.id
+    GROUP BY u.id,u.nombre,e.codigo,e.meta_minutos
+    ORDER BY lower(u.nombre),e.codigo,u.id`)
+  return rows.map(row => {
+    const targetMinutes = row.meta_minutos
+    const accreditedMinutes = Number(row.acreditados)
+    return {
+      id: row.id, name: row.nombre, code: row.codigo, targetMinutes, accreditedMinutes,
+      remainingMinutes: Math.max(targetMinutes - accreditedMinutes, 0),
+      completed: accreditedMinutes >= targetMinutes,
+    }
+  })
 }

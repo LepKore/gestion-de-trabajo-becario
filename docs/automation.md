@@ -14,7 +14,7 @@ git config core.hooksPath .githooks
 
 El plugin de OpenCode se carga solo desde `.opencode/plugin` al abrir el proyecto; puede comprobarse con `opencode plugin list`. No requiere instalación ni dependencias: usa el paquete `@opencode/plugin` que provee el propio cliente.
 
-Esta configuración es local del clon y no viaja por Git. Los perfiles `.codex/agents/backend-data.toml` y `.codex/agents/reviewer.toml` se cargan desde un cliente Codex compatible al trabajar en este repositorio. El agente principal coordina y asigna archivos; el agente de revisión empieza en modo lectura.
+Esta configuración es local del clon y no viaja por Git. Los perfiles `.codex/agents/backend-data.toml` y `.codex/agents/reviewer.toml` se cargan desde un cliente Codex compatible al trabajar en este repositorio. El agente principal coordina y asigna archivos; el agente de revisión empieza en modo lectura. Las skills de proyecto usan `.agents/skills` como fuente común para Codex y OpenCode, en lugar de duplicar archivos en `.codex` y `.opencode`.
 
 ## Comportamiento y límites
 

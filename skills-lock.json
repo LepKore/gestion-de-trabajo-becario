@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "skills": {
+    "deploy-checklist": {
+      "source": "anthropics/knowledge-work-plugins",
+      "sourceType": "github",
+      "skillPath": "engineering/skills/deploy-checklist/SKILL.md",
+      "computedHash": "9d0361235cd2cec686a5bcf52259e07785f48d139dd6420b67b4a01a90baf3a7"
+    },
+    "testing": {
+      "source": "grafana/skills",
+      "sourceType": "github",
+      "skillPath": "skills/grafana-cloud/testing/SKILL.md",
+      "computedHash": "a79f64578b69c030f9946d39bb346adb8b192eb4d4c82a71b116c974796186fb"
+    }
+  }
+}
