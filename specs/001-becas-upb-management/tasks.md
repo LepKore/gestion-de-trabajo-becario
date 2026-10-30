@@ -127,9 +127,9 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 - [X] T028 [P] Verify all evaluation endpoints and schemas against the reviewed `openapi.yaml` revision in `test/contracts/evaluations.test.js`
 - [X] T029 [P] Run the security audit for role and ownership checks in `src/routes/jobs.js`, `src/services/jobs.js`, and `src/routes/control.js`
 - [X] T030 [P] Measure SC-001 and SC-002 using at least 100 jobs, 1,000 applications, and 20 authenticated requests; record p95 results in `specs/001-becas-upb-management/quickstart.md`
-- [ ] T031 [P] Verify every credited minute is traceable to one closed job, one attendance record, and one accepted application in `test/control.test.js`
-- [ ] T032 [P] Run the scenarios in `specs/001-becas-upb-management/quickstart.md` and record results
-- [ ] T033 [P] Update `docs/AI_CONTEXT.md` with the implemented evaluation module status
+- [X] T031 [P] Verify every credited minute is traceable to one closed job, one attendance record, and one accepted application in `test/control.test.js`
+- [X] T032 [P] Run the scenarios in `specs/001-becas-upb-management/quickstart.md` and record results
+- [X] T033 [P] Update `docs/AI_CONTEXT.md` with the implemented evaluation module status
 
 ---
 
@@ -182,13 +182,13 @@ description: "Task list for the UPB scholarship work and evaluation feature"
 
 ## Phase 7: Convergence
 
-- [ ] T034 [US1] Add an integration regression test that creates an evaluation through `POST /applications/:id/evaluation` and proves credited minutes and progress are unchanged, per T012, FR-010, and SC-005 (partial).
-- [ ] T035 [P] [US2] Add `test/authorization.test.js` covering the role, account-active, ownership, and self-rating authorization matrix for evaluation, rating, attendance, and administrative compliance, per T016 and FR-009 (missing).
-- [ ] T036 [US2] Add `test/jobs-evaluation.test.js` covering closed-job eligibility, confirmed attendance, owner-only access, duplicate rejection, 1–5 validation, immutable records, and no-hour-change behavior, per T017 and US2 acceptance scenarios (missing).
-- [ ] T037 [P] [US2] Add `test/contracts/evaluations.test.js` that validates evaluation request/response shapes and `201/400/401/403/404/409` behavior against `openapi.yaml`, per T018 and Constitution IV (missing).
-- [ ] T038 [P] [US3] Add `test/control-admin.test.js` covering ADMIN-only compliance access and the single-response fields without evaluation scores, per T023, FR-008, and SC-004 (missing).
-- [ ] T039 [US3] Add regression assertions that `/me/progress`, student history, owner history, and administrative compliance responses are sourced from attendance only and never expose evaluation fields, per T024, FR-008, and FR-010 (missing).
-- [ ] T040 [P] Measure SC-001 and SC-002 with at least 100 jobs, 1,000 applications, and 20 authenticated requests; record p95 results and dataset details in `specs/001-becas-upb-management/quickstart.md`, per T030, SC-001, and SC-002 (missing).
-- [ ] T041 [P] Add automated contract validation for both evaluation endpoints, their schemas, authorization metadata, and documented error responses against the canonical `openapi.yaml`, per T028 and Constitution I/IV (missing).
-- [ ] T042 Add a traceability test proving every credited minute references one accepted application, one closed job, and one attendance record, and that evaluations are absent from the accreditation path, per T031 and SC-005 (missing).
-- [ ] T043 [P] Execute the evaluation and rating scenarios in `quickstart.md`, record pass/fail evidence, and update `docs/AI_CONTEXT.md` with the implemented evaluation module status, per T032–T033 (missing).
+- [X] T034 [US1] Add an integration regression test that creates an evaluation through `POST /applications/:id/evaluation` and proves credited minutes and progress are unchanged, per T012, FR-010, and SC-005 (partial).
+- [X] T035 [P] [US2] Add `test/authorization.test.js` covering the role, account-active, ownership, and self-rating authorization matrix for evaluation, rating, attendance, and administrative compliance, per T016 and FR-009 (missing).
+- [X] T036 [US2] Add `test/jobs-evaluation.test.js` covering closed-job eligibility, confirmed attendance, owner-only access, duplicate rejection, 1–5 validation, immutable records, and no-hour-change behavior, per T017 and US2 acceptance scenarios (missing).
+- [X] T037 [P] [US2] Add `test/contracts/evaluations.test.js` that validates evaluation request/response shapes and `201/400/401/403/404/409` behavior against `openapi.yaml`, per T018 and Constitution IV (missing).
+- [X] T038 [P] [US3] Add `test/control-admin.test.js` covering ADMIN-only compliance access and the single-response fields without evaluation scores, per T023, FR-008, and SC-004 (missing).
+- [X] T039 [US3] Add regression assertions that `/me/progress`, student history, owner history, and administrative compliance responses are sourced from attendance only and never expose evaluation fields, per T024, FR-008, and FR-010 (missing).
+- [X] T040 [P] Measure SC-001 and SC-002 with at least 100 jobs, 1,000 applications, and 20 authenticated requests; record p95 results and dataset details in `specs/001-becas-upb-management/quickstart.md`, per T030, SC-001, and SC-002 (missing).
+- [X] T041 [P] Add automated contract validation for both evaluation endpoints, their schemas, authorization metadata, and documented error responses against the canonical `openapi.yaml`, per T028 and Constitution I/IV (missing).
+- [X] T042 Add a traceability test proving every credited minute references one accepted application, one closed job, and one attendance record, and that evaluations are absent from the accreditation path, per T031 and SC-005 (missing).
+- [X] T043 [P] Execute the evaluation and rating scenarios in `quickstart.md`, record pass/fail evidence, and update `docs/AI_CONTEXT.md` with the implemented evaluation module status, per T032–T033 (missing).

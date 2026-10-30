@@ -270,11 +270,66 @@ it('la evaluación no modifica horas acreditadas ni progreso', async () => {
   const stored = await ctx.pool.query('SELECT minutos_acreditados FROM asistencias WHERE postulacion_id=$1', [applicationId])
   assert.equal(stored.rows[0].minutos_acreditados, 60)
   for (const result of [
+    await first.get('/api/v1/me/progress'),
     await first.get('/api/v1/me/history'),
     await owner.get('/api/v1/me/history'),
+    await admin.get(`/api/v1/students/${first.id}/history`),
+    await admin.get('/api/v1/students/compliance'),
     await admin.get('/api/v1/students/progress'),
   ]) {
     assert.equal(result.status, 200)
     assert.doesNotMatch(JSON.stringify(result.body), /"(?:promedio|responsabilidad|puntualidad|proactividad|comunicacion|rating)"/)
   }
+})
+
+it('makes every credited minute traceable to an accepted application, attendance, and closed job', async () => {
+  const jobId = await createJob(120, 2)
+  const attendedId = await apply(first, jobId, true)
+  const absentId = await apply(second, jobId, true)
+  const creditedBefore = (await first.get('/api/v1/me/progress')).body.data.accreditedMinutes
+  await finish(jobId)
+  assert.equal((await close(jobId, [
+    { applicationId: attendedId, attended: true },
+    { applicationId: absentId, attended: false },
+  ])).status, 200)
+
+  const trace = async () => (await ctx.pool.query(`
+    SELECT a.postulacion_id, a.trabajo_id, p.trabajo_id AS postulacion_trabajo_id,
+      a.asistio, a.minutos_acreditados,
+      p.estado AS estado_postulacion, t.estado AS estado_trabajo,
+      t.duracion_minutos, c.trabajo_id AS trabajo_cerrado_id,
+      e.postulacion_id AS evaluacion_postulacion_id
+    FROM asistencias a
+    JOIN postulaciones p ON p.id=a.postulacion_id
+    JOIN trabajos t ON t.id=a.trabajo_id
+    JOIN cierres c ON c.trabajo_id=t.id
+    LEFT JOIN evaluaciones e ON e.postulacion_id=p.id
+    WHERE a.trabajo_id=$1
+    ORDER BY a.postulacion_id`, [jobId])).rows
+
+  const beforeEvaluation = await trace()
+  assert.equal(beforeEvaluation.length, 2)
+  assert.equal(new Set(beforeEvaluation.map(row => row.postulacion_id)).size, 2)
+  for (const row of beforeEvaluation) {
+    assert.equal(row.trabajo_id, jobId)
+    assert.equal(row.postulacion_trabajo_id, jobId)
+    assert.equal(row.trabajo_cerrado_id, jobId)
+    assert.equal(row.estado_postulacion, 'ACEPTADA')
+    assert.equal(row.estado_trabajo, 'CERRADO')
+    assert.equal(row.minutos_acreditados, row.asistio ? row.duracion_minutos : 0)
+  }
+  assert.equal(beforeEvaluation.reduce((total, row) => total + row.minutos_acreditados, 0), 120)
+  assert.equal((await ctx.pool.query('SELECT count(*)::int AS n FROM evaluaciones WHERE postulacion_id=ANY($1::uuid[])', [[attendedId, absentId]])).rows[0].n, 0)
+
+  assert.equal((await owner.post(`/api/v1/applications/${attendedId}/evaluation`, {
+    responsabilidad: 5, puntualidad: 4, proactividad: 5, comunicacion: 4,
+  })).status, 201)
+  const progressAfterClosure = (await first.get('/api/v1/me/progress')).body.data
+  assert.equal(progressAfterClosure.accreditedMinutes, creditedBefore + 120)
+  const afterEvaluation = await trace()
+  assert.deepEqual(afterEvaluation.map(({ evaluacion_postulacion_id: _evaluation, ...row }) => row),
+    beforeEvaluation.map(({ evaluacion_postulacion_id: _evaluation, ...row }) => row))
+  assert.equal(afterEvaluation.find(row => row.postulacion_id === attendedId).evaluacion_postulacion_id, attendedId)
+  assert.equal(afterEvaluation.reduce((total, row) => total + row.minutos_acreditados, 0), 120)
+  assert.deepEqual((await first.get('/api/v1/me/progress')).body.data, progressAfterClosure)
 })

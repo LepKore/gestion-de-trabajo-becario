@@ -58,3 +58,13 @@ The administrative compliance query lives in `src/services/student-progress.js` 
 registered by `src/routes/control.js`; it sums only `asistencias.minutos_acreditados`.
 The web client at commit `7628a29` can transport the new calls but has no evaluation or
 rating UI yet. Frontend integration is separate from this backend task block.
+
+## Convergence verification (2026-10-29)
+
+- Docker Desktop Engine 29.7.2 was active. The Docker CLI was not on PATH, but its engine API confirmed the postgres:17.11 container was healthy and published 127.0.0.1:5434.
+- TEST_DATABASE_URL pointed to local 127.0.0.1:5434/mibeca_test, which did not exist initially. After verifying DATABASE_URL targeted local mibeca_dev on the same host and port, mibeca_test was created. The development database schema and rows were not changed; the test helper recreates only the public schema inside mibeca_test.
+- npm test: 86/86 passed, including both quickstart scenarios, the new role/account-active matrix, response isolation, and minute traceability assertions.
+- Scenario 1, evaluation creation: test/jobs-evaluation.test.js verifies owner eligibility, closed job, confirmed attendance, 201 response, immutable duplicate rejection, and unchanged credited minutes.
+- Scenario 2, rating aggregation: test/jobs.test.js verifies ten realized jobs, available evaluations, and the fewer-than-ten response. Compliance isolation is covered by test/control-admin.test.js and test/control.test.js.
+- T040 performance run: 100 jobs, 1,000 applications, and 20 authenticated requests per endpoint. Fresh p95: GET /jobs 15.12 ms; GET /me/progress 5.74 ms; evaluation creation 19.97 ms.
+- npm run lint, npm run build, and npm run audit:all passed. Contract tests passed 2/2, syntax checks passed for 47 files, and the audit self-check passed 40/40.

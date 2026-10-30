@@ -72,3 +72,11 @@ Spec Kit (github.com/github/spec-kit, v1.2.4.dev0) es el marco de trabajo SDD de
 No inferir que documentos propuestos son funcionalidades implementadas. El siguiente cambio de dominio requiere cerrar contrato, esquema y reglas del plan, después migraciones y pruebas. Entregar al coordinador rutas, resultados, riesgos y cambios de contrato que necesite frontend. No ejecutar despliegues ni migraciones remotas por iniciativa del perfil.
 
 La supervisión administrativa (`GET /students/progress`, `GET /students/{id}/history`) y los dashboards reales por rol se implementaron en fase 5; evidencia y validaciones pendientes en `VERIFICACION_FASE_5.md`. Antes de cualquier despliegue hay que rotar la contraseña de Supabase expuesta en la prueba del 18-10-2026 y resolver el nombre de los modos SSL (`require` se comporta como `verify-ca`).
+
+### 2026-10-29: modulo de evaluaciones y calificacion
+
+El backend implementa evaluaciones inmutables para el encargado propietario, la calificacion del becario sobre sus ultimos diez trabajos realizados y el cumplimiento institucional de horas para ADMIN. La asistencia persistida sigue siendo la unica fuente de minutos acreditados; progreso, historiales y cumplimiento no exponen puntajes. El contrato canonico es OpenAPI 1.5.0 e incluye GET /me/rating y POST /applications/{id}/evaluation.
+
+La suite de integracion paso 86/86, incluyendo trazabilidad, matriz de roles y cuentas activas, aislamiento de respuestas y cumplimiento sin puntajes. Tambien pasaron npm run lint, npm run build, npm run audit:all, los 2 tests de contrato y la comprobacion de sintaxis de 47 archivos. La medicion en PostgreSQL 17.11 local con 100 trabajos, 1.000 postulaciones y 20 solicitudes por endpoint obtuvo p95 de 15.12 ms para GET /jobs, 5.74 ms para GET /me/progress y 19.97 ms para crear evaluacion; ver specs/001-becas-upb-management/quickstart.md.
+
+Docker Desktop Engine 29.7.2 estaba activo y confirmo el contenedor postgres:17.11 healthy en 127.0.0.1:5434. El CLI no estaba en PATH. Se creo la base local mibeca_test porque faltaba; las pruebas se ejecutaron solo ahi y no alteraron mibeca_dev.
